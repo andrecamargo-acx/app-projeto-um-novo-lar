@@ -19,15 +19,13 @@ import mysql.connector
 
 # ============================================================
 # ⚙️ Configuração do MySQL
-# - Em produção (Render): usar variáveis de ambiente
-# - Em desenvolvimento local: opcionalmente usar mysql_config.json
 # ============================================================
 
 CONFIG_PATH = Path("mysql_config.json")
 
 
 def carregar_config_mysql() -> dict:
-    # Prioriza variáveis de ambiente (ex.: para uso no Render)
+    # Em produção (Render): variáveis de ambiente
     host = os.getenv("DB_HOST")
     if host:
         return {
@@ -38,7 +36,7 @@ def carregar_config_mysql() -> dict:
             "database": os.getenv("DB_NAME"),
         }
 
-    # Fallback: arquivo local mysql_config.json (para rodar no PC)
+    # Desenvolvimento local: mysql_config.json
     if not CONFIG_PATH.exists():
         raise FileNotFoundError(
             f"Arquivo de configuração {CONFIG_PATH} não encontrado.\n"
@@ -87,7 +85,7 @@ app.secret_key = os.environ.get(
 
 
 # ============================================================
-# 👥 Funções auxiliares de usuário (tabela usuarios)
+# 👥 Funções auxiliares de usuário
 # ============================================================
 
 def criar_usuario(nome: str, email: str, senha: str, perfil: str = "colaborador"):
@@ -121,7 +119,7 @@ def buscar_usuario_por_email(email: str):
 
 
 # ============================================================
-# 🔐 Decorator para rotas que exigem login
+# 🔐 Decorator de login
 # ============================================================
 
 def login_required(f):
@@ -136,7 +134,7 @@ def login_required(f):
 
 
 # ============================================================
-# 🎨 Layout base (v2) – com logo, topbar e estilo mais profissional
+# 🎨 Layout base (v2) – logo maior e fundo branco
 # ============================================================
 
 layout_base = """
@@ -207,24 +205,26 @@ layout_base = """
         }
 
         .brand-logo {
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
-            background: radial-gradient(circle at 30% 20%, #ffffff, var(--primary));
+            width: 64px;
+            height: 64px;
+            border-radius: 14px;
+            background: #ffffff;            /* fundo branco, sem degradê */
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
+            border: 1px solid #e5e7eb;      /* borda leve */
+            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.15);  /* leve destaque */
         }
 
         .brand-logo img {
-            width: 100%;
-            height: 100%;
+            width: 90%;
+            height: 90%;
             object-fit: contain;
         }
 
         .brand-text-title {
-            font-size: 18px;
+            font-size: 20px;               /* um pouco maior */
             font-weight: 700;
             letter-spacing: 0.04em;
             text-transform: uppercase;
@@ -1206,7 +1206,7 @@ def nova_pessoa():
 
 
 # ============================================================
-# ▶️ Rodar app (para desenvolvimento local)
+# ▶️ Main
 # ============================================================
 
 if __name__ == "__main__":
