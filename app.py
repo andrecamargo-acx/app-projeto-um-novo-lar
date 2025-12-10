@@ -1,28 +1,8 @@
-# %% [markdown]
-# 
-# # 🌐 03 - Aplicação Web (Flask) com Login
-# 
-# Esta aplicação web permite:
-# 
-# - Login e logout de usuários cadastrados na tabela `usuarios`
-# - Cadastro de novas pessoas acolhidas (tabela `pessoas`)
-# - Listagem básica das pessoas cadastradas
-# 
-# ## Ordem recomendada de uso
-# 
-# 1. `00_mysql_config.ipynb` → salva a configuração do MySQL.
-# 2. `01_config_db.ipynb` → cria as tabelas `pessoas` e `usuarios`.
-# 3. `02_funcoes_cadastro.ipynb` → funções de apoio para `pessoas` (opcional).
-# 4. Este notebook → sobe o servidor Flask.
-# 
-# > Antes de rodar, instale as dependências (no terminal do ambiente Python):
-# >
-# > ```bash
-# > pip install flask mysql-connector-python
-# > ```
-# 
+import os
+import json
+from datetime import datetime
+from pathlib import Path
 
-# %%
 from flask import (
     Flask,
     request,
@@ -33,31 +13,37 @@ from flask import (
     render_template_string,
 )
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from functools import wraps
 import mysql.connector
-from pathlib import Path
-import json
-from datetime import datetime
 
-
-
-# %%
 # ============================================================
-# 🔧 Carrega configuração do MySQL a partir do mysql_config.json
-# (gerado pelo 00_mysql_config.ipynb)
-
-
-# %%
+# ⚙️ Configuração do MySQL
+# - Em produção (Render): usar variáveis de ambiente
+# - Em desenvolvimento local: opcionalmente usar mysql_config.json
 # ============================================================
 
 CONFIG_PATH = Path("mysql_config.json")
 
 
 def carregar_config_mysql() -> dict:
+    # Prioriza variáveis de ambiente (ex.: para uso no Render)
+    host = os.getenv("DB_HOST")
+    if host:
+        return {
+            "host": host,
+            "port": int(os.getenv("DB_PORT", "3306")),
+            "user": os.getenv("DB_USER"),
+            "password": os.getenv("DB_PASSWORD"),
+            "database": os.getenv("DB_NAME"),
+        }
+
+    # Fallback: arquivo local mysql_config.json (para rodar no PC)
     if not CONFIG_PATH.exists():
         raise FileNotFoundError(
             f"Arquivo de configuração {CONFIG_PATH} não encontrado.\n"
-            "Execute antes o notebook 00_mysql_config.ipynb para gerar o mysql_config.json."
+            "Defina as variáveis de ambiente DB_HOST, DB_USER, DB_PASSWORD, DB_NAME\n"
+            "ou gere o mysql_config.json com o 00_mysql_config.ipynb."
         )
     return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
@@ -73,29 +59,35 @@ def get_connection():
     )
 
 
+# ============================================================
+# 📁 Upload de fotos
+# ============================================================
+
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+FOTOS_DIR = STATIC_DIR / "fotos_pessoas"
+FOTOS_DIR.mkdir(parents=True, exist_ok=True)
+
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
 
-# %%
+def allowed_file(filename: str) -> bool:
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
 # ============================================================
 # 🌐 App Flask
-
-
-# %%
 # ============================================================
 
-app = Flask(__name__)
-# IMPORTANTE: troque essa chave depois por algo forte e secreto
-app.secret_key = "mude-esta-chave-para-uma-string-bem-grande-e-secreta"
+app = Flask(__name__, static_folder="static")
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "mude-esta-chave-para-uma-string-bem-grande-e-secreta",
+)
 
 
-
-
-# %%
 # ============================================================
 # 👥 Funções auxiliares de usuário (tabela usuarios)
-
-
-# %%
 # ============================================================
 
 def criar_usuario(nome: str, email: str, senha: str, perfil: str = "colaborador"):
@@ -128,81 +120,74 @@ def buscar_usuario_por_email(email: str):
     return row
 
 
-
-
-# %%
 # ============================================================
 # 🔐 Decorator para rotas que exigem login
-
-
-# %%
 # ============================================================
 
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        if "usuario_id" not in session:
-            flash("Faça login para acessar essa página.", "warning")
+        if not session.get("usuario_id"):
+            flash("Faça login para acessar esta página.", "warning")
             return redirect(url_for("login"))
         return f(*args, **kwargs)
 
     return wrapper
 
 
-
-
-# %%
 # ============================================================
-# 🧱 Layout base (template HTML)
-
-
-# %%
+# 🎨 Layout base (v2) – com logo, topbar e estilo mais profissional
 # ============================================================
 
 layout_base = """
 <!doctype html>
-<html lang=\"pt-br\">
+<html lang="pt-br">
 <head>
-    <meta charset=\"utf-8\">
-    <title>{{ titulo or \"Um novo lar\" }}</title>
+    <meta charset="utf-8">
+    <title>{{ titulo or "Um novo lar" }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Chart.js para gráficos do dashboard -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         :root {
-            --primary: #0d6efd;
-            --primary-light: #e7f1ff;
-            --primary-dark: #0b5ed7;
-            --bg-body: #f0f4f8;
-            --card-bg: #ffffff;
-            --border-soft: #dde2eb;
+            --bg-gradient-start: #e6f0ff;
+            --bg-gradient-end: #ffffff;
+            --primary: #1c75ff;
+            --primary-light: #92b9ff;
+            --primary-dark: #165fcc;
+            --accent: #00b894;
             --text-main: #1f2933;
             --text-muted: #6b7280;
-            --danger: #dc3545;
-            --success: #198754;
-            --warning: #ffc107;
+            --border-subtle: #dde2eb;
+            --danger: #e74c3c;
+            --warning: #f1c40f;
+            --success: #2ecc71;
         }
 
         * {
             box-sizing: border-box;
-            margin: 0;
-            padding: 0;
         }
 
         body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;
-            background: radial-gradient(circle at top left, #e0f2fe, #f9fafb 45%, #e5e7eb);
-            color: var(--text-main);
+            margin: 0;
             padding: 24px;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: linear-gradient(135deg, var(--bg-gradient-start), var(--bg-gradient-end));
+            color: var(--text-main);
         }
 
         .app-shell {
-            max-width: 1080px;
+            max-width: 1100px;
             margin: 0 auto;
-            background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(241,245,249,0.98));
+            background: #ffffff;
             border-radius: 18px;
+            padding: 20px 24px 28px;
             box-shadow:
-                0 22px 45px rgba(15, 23, 42, 0.15),
-                0 0 0 1px rgba(148, 163, 184, 0.15);
-            border: 1px solid rgba(226, 232, 240, 0.9);
-            padding: 22px 26px 26px;
+                0 18px 35px rgba(15, 35, 95, 0.08),
+                0 0 0 1px rgba(15, 23, 42, 0.04);
+            border: 1px solid rgba(148, 163, 184, 0.3);
         }
 
         .topbar {
@@ -211,23 +196,21 @@ layout_base = """
             justify-content: space-between;
             gap: 16px;
             margin-bottom: 18px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--border-subtle);
         }
 
         .brand {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 12px;
         }
 
         .brand-logo {
-            width: 52px;
-            height: 52px;
-            border-radius: 14px;
-            padding: 6px;
-            background: radial-gradient(circle at 30% 0, #ffffff, #dbeafe);
-            box-shadow:
-                0 10px 25px rgba(37, 99, 235, 0.25),
-                0 0 0 1px rgba(191, 219, 254, 0.9);
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: radial-gradient(circle at 30% 20%, #ffffff, var(--primary));
             display: flex;
             align-items: center;
             justify-content: center;
@@ -235,148 +218,212 @@ layout_base = """
         }
 
         .brand-logo img {
-            max-width: 100%;
-            max-height: 100%;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
         }
 
-        .brand-text {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .brand-title {
-            font-size: 1.05rem;
+        .brand-text-title {
+            font-size: 18px;
             font-weight: 700;
             letter-spacing: 0.04em;
             text-transform: uppercase;
-            color: var(--primary-dark);
         }
 
-        .brand-subtitle {
-            font-size: 0.88rem;
+        .brand-text-subtitle {
+            font-size: 12px;
             color: var(--text-muted);
         }
 
-        .nav-area {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 6px;
-        }
-
-        .user-greeting {
-            font-size: 0.85rem;
+        .user-info {
+            font-size: 13px;
             color: var(--text-muted);
+            margin-bottom: 4px;
+            text-align: right;
         }
 
-        .nav-links {
+        .menu {
             display: flex;
+            gap: 8px;
             flex-wrap: wrap;
-            gap: 6px;
+            justify-content: flex-end;
         }
 
-        .nav-pill {
-            font-size: 0.82rem;
-            padding: 6px 11px;
+        .menu a {
+            font-size: 13px;
+            padding: 6px 12px;
             border-radius: 999px;
             border: 1px solid transparent;
             text-decoration: none;
-            color: var(--primary-dark);
-            background: rgba(219, 234, 254, 0.9);
-            font-weight: 500;
-            transition: all 0.16s ease-out;
-        }
-
-        .nav-pill:hover {
-            background: #ffffff;
-            border-color: rgba(37, 99, 235, 0.3);
-            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
-            transform: translateY(-1px);
-        }
-
-        .nav-pill--secondary {
-            background: #f3f4f6;
-            color: #374151;
-        }
-
-        hr.soft-separator {
-            border: none;
-            border-top: 1px solid rgba(209, 213, 219, 0.7);
-            margin: 4px 0 14px;
-        }
-
-        .content-card {
-            background: var(--card-bg);
-            border-radius: 14px;
-            padding: 18px 18px 20px;
-            border: 1px solid rgba(226, 232, 240, 0.9);
-            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
-        }
-
-        h1, h2, h3 {
             color: var(--text-main);
+            background: #f3f4ff;
+            transition: all 0.15s ease;
         }
 
-        h2 {
-            font-size: 1.1rem;
-            margin-bottom: 10px;
+        .menu a:hover {
+            background: #e0e7ff;
+            border-color: var(--primary-light);
         }
 
-        p {
-            margin-bottom: 10px;
-            font-size: 0.94rem;
+        .menu a.menu-primary {
+            background: var(--primary);
+            color: #ffffff;
+            border-color: var(--primary-dark);
+            box-shadow: 0 6px 14px rgba(37, 99, 235, 0.4);
         }
 
-        /* Flash messages */
+        .menu a.menu-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .flash-container {
+            margin-bottom: 12px;
+        }
+
         .flash {
-            padding: 8px 10px;
-            margin-bottom: 10px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
             border-radius: 10px;
+            font-size: 13px;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
             border: 1px solid transparent;
-            font-size: 0.9rem;
         }
 
         .flash-success {
-            background: #ecfdf5;
-            color: var(--success);
-            border-color: rgba(16, 185, 129, 0.6);
+            background: #ecfdf3;
+            border-color: #bbf7d0;
+            color: #166534;
         }
 
         .flash-warning {
             background: #fffbeb;
+            border-color: #facc15;
             color: #92400e;
-            border-color: rgba(251, 191, 36, 0.7);
         }
 
         .flash-error {
             background: #fef2f2;
-            color: var(--danger);
-            border-color: rgba(248, 113, 113, 0.7);
+            border-color: #fecaca;
+            color: #b91c1c;
         }
 
-        /* Tabelas */
+        .content-card {
+            margin-top: 6px;
+            padding: 16px 18px 20px;
+            border-radius: 16px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+        }
+
+        h1, h2, h3 {
+            margin-top: 0;
+            color: var(--text-main);
+        }
+
+        h2 {
+            font-size: 20px;
+            margin-bottom: 14px;
+        }
+
+        .btn {
+            padding: 7px 13px;
+            border-radius: 999px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: #ffffff;
+            box-shadow: 0 8px 16px rgba(37, 99, 235, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 22px rgba(37, 99, 235, 0.5);
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .btn-secondary:hover {
+            background: #d1d5db;
+        }
+
+        .field-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px 16px;
+            margin-bottom: 12px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        label {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-main);
+        }
+
+        input[type=text],
+        input[type=password],
+        input[type=date],
+        textarea,
+        select {
+            width: 100%;
+            padding: 7px 9px;
+            border-radius: 9px;
+            border: 1px solid #d1d5db;
+            font-size: 13px;
+            outline: none;
+            transition: all 0.15s ease;
+            background: #ffffff;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+        }
+
+        textarea {
+            min-height: 70px;
+            resize: vertical;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 8px;
-            font-size: 0.9rem;
-        }
-
-        thead tr {
-            background: linear-gradient(90deg, #e5edff, #f1f5f9);
+            font-size: 13px;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
         }
 
         th, td {
-            padding: 8px 9px;
+            padding: 8px 10px;
             border-bottom: 1px solid #e5e7eb;
-            text-align: left;
         }
 
-        th {
-            font-weight: 600;
-            color: #374151;
+        thead {
+            background: linear-gradient(135deg, #eff6ff, #e0f2fe);
         }
 
         tbody tr:nth-child(even) {
@@ -384,173 +431,214 @@ layout_base = """
         }
 
         tbody tr:hover {
-            background: #eff6ff;
+            background: #e5f1ff;
         }
 
-        /* Formulários */
-        .field {
-            margin-bottom: 10px;
+        .photo-thumb {
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            object-fit: cover;
+            border: 2px solid #e5e7eb;
         }
 
-        label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 4px;
-            font-size: 0.86rem;
-            color: #374151;
-        }
-
-        input[type=text],
-        input[type=password],
-        input[type=date],
-        textarea {
-            width: 100%;
-            padding: 7px 8px;
-            border-radius: 8px;
-            border: 1px solid #d1d5db;
-            font-size: 0.92rem;
-            transition: border-color 0.15s ease-out, box-shadow 0.15s ease-out;
-        }
-
-        input:focus,
-        textarea:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35);
-        }
-
-        textarea {
-            min-height: 80px;
-            resize: vertical;
-        }
-
-        /* Botões */
-        .btn {
+        .photo-thumb-placeholder {
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            border: 2px dashed #cbd5e1;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
-            padding: 7px 14px;
-            border-radius: 999px;
-            border: none;
-            cursor: pointer;
-            text-decoration: none;
-            font-size: 0.88rem;
-            font-weight: 500;
-            transition: all 0.15s ease-out;
+            font-size: 9px;
+            color: #9ca3af;
         }
 
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: #ffffff;
-            box-shadow: 0 10px 25px rgba(37, 99, 235, 0.35);
-        }
-
-        .btn-primary:hover {
-            filter: brightness(1.05);
-            transform: translateY(-1px);
-            box-shadow: 0 14px 30px rgba(37, 99, 235, 0.45);
-        }
-
-        .btn-secondary {
-            background: #f3f4f6;
-            color: #374151;
-            border: 1px solid #d1d5db;
-        }
-
-        .btn-secondary:hover {
-            background: #e5e7eb;
-        }
-
-        .btn-danger {
-            background: #fee2e2;
-            color: #b91c1c;
-            border: 1px solid #fecaca;
-        }
-
-        .btn-danger:hover {
-            background: #fecaca;
-        }
-
-        .actions-row {
-            margin-top: 12px;
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        /* Grids de formulário */
-        .field-group {
+        .details-layout {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 12px;
+            grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+            gap: 18px;
+        }
+
+        .details-block {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 12px 14px;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 8px;
+        }
+
+        .details-block h3 {
+            font-size: 14px;
             margin-bottom: 6px;
         }
 
-        /* Responsividade */
-        @media (max-width: 768px) {
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 8px 16px;
+        }
+
+        .details-item-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+        }
+
+        .details-item-value {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .photo-large-wrapper {
+            text-align: center;
+        }
+
+        .photo-large {
+            width: 160px;
+            height: 160px;
+            border-radius: 24px;
+            object-fit: cover;
+            border: 3px solid #e5e7eb;
+            box-shadow:
+                0 15px 30px rgba(15, 35, 95, 0.25),
+                0 0 0 1px rgba(148, 163, 184, 0.4);
+            margin-bottom: 8px;
+        }
+
+        .photo-large-placeholder {
+            width: 160px;
+            height: 160px;
+            border-radius: 24px;
+            border: 2px dashed #cbd5e1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: #9ca3af;
+            margin-bottom: 8px;
+        }
+
+        .photo-caption {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .cards-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .card-metric {
+            padding: 10px 12px;
+            border-radius: 14px;
+            border: 1px solid #e5e7eb;
+            background: #ffffff;
+        }
+
+        .card-metric-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+        }
+
+        .card-metric-value {
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        .card-metric-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .charts-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            margin-top: 8px;
+        }
+
+        .chart-card {
+            background: #ffffff;
+            border-radius: 14px;
+            padding: 10px 12px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .chart-card h3 {
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+
+        @media (max-width: 720px) {
             body {
                 padding: 10px;
             }
             .app-shell {
-                padding: 16px 14px 18px;
+                padding: 14px 14px 18px;
             }
             .topbar {
                 flex-direction: column;
                 align-items: flex-start;
             }
-            .nav-area {
-                width: 100%;
-                align-items: flex-start;
+            .user-info {
+                text-align: left;
             }
-            .nav-links {
-                width: 100%;
+            .details-layout {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
-<div class=\"app-shell\">
-    <div class=\"topbar\">
-        <div class=\"brand\">
-            <div class=\"brand-logo\">
-                <img src=\"{{ url_for('static', filename='logo_um_novo_lar.png') }}\" alt=\"Logo Um novo lar\">
+<div class="app-shell">
+    <div class="topbar">
+        <div class="brand">
+            <div class="brand-logo">
+                <img src="{{ url_for('static', filename='logo_um_novo_lar.png') }}" alt="Um novo lar">
             </div>
-            <div class=\"brand-text\">
-                <div class=\"brand-title\">UM NOVO LAR</div>
-                <div class=\"brand-subtitle\">Sistema de acolhimento e acompanhamento</div>
+            <div>
+                <div class="brand-text-title">UM NOVO LAR</div>
+                <div class="brand-text-subtitle">Sistema de acolhimento e cadastro</div>
             </div>
         </div>
-        <div class=\"nav-area\">
+        <div>
             {% if session.get('usuario_id') %}
-                <div class=\"user-greeting\">
-                    Olá, <strong>{{ session.get('usuario_nome') }}</strong>
-                </div>
-                <div class=\"nav-links\">
-                    <a class=\"nav-pill\" href=\"{{ url_for('lista_pessoas') }}\">Pessoas acolhidas</a>
-                    <a class=\"nav-pill\" href=\"{{ url_for('nova_pessoa') }}\">Novo cadastro</a>
-                    <a class=\"nav-pill nav-pill--secondary\" href=\"{{ url_for('logout') }}\">Sair</a>
-                </div>
-            {% else %}
-                <div class=\"nav-links\">
-                    <a class=\"nav-pill\" href=\"{{ url_for('login') }}\">Login</a>
-                    <a class=\"nav-pill nav-pill--secondary\" href=\"{{ url_for('registrar') }}\">Criar acesso</a>
+                <div class="user-info">
+                    Olá, {{ session.get('usuario_nome') }}
                 </div>
             {% endif %}
+            <div class="menu">
+                {% if session.get('usuario_id') %}
+                    <a href="{{ url_for('dashboard') }}" class="menu-primary">Dashboard</a>
+                    <a href="{{ url_for('lista_pessoas') }}">Pessoas acolhidas</a>
+                    <a href="{{ url_for('nova_pessoa') }}">Novo cadastro</a>
+                    <a href="{{ url_for('logout') }}">Sair</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="menu-primary">Login</a>
+                    <a href="{{ url_for('registrar') }}">Criar acesso</a>
+                {% endif %}
+            </div>
         </div>
     </div>
 
-    <hr class=\"soft-separator\">
+    <div class="flash-container">
+        {% with messages = get_flashed_messages(with_categories=True) %}
+          {% if messages %}
+            {% for cat, msg in messages %}
+              <div class="flash flash-{{ cat }}">{{ msg }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+    </div>
 
-    {% with messages = get_flashed_messages(with_categories=True) %}
-      {% if messages %}
-        {% for cat, msg in messages %}
-          <div class=\"flash flash-{{ cat }}\">{{ msg }}</div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
-
-    <div class=\"content-card\">
+    <div class="content-card">
         {{ conteudo|safe }}
     </div>
 </div>
@@ -559,25 +647,18 @@ layout_base = """
 """
 
 
-
 def render_page(titulo: str, conteudo_html: str):
     return render_template_string(layout_base, titulo=titulo, conteudo=conteudo_html)
 
 
-
-
-# %%
 # ============================================================
 # 🧭 Rotas
-
-
-# %%
 # ============================================================
 
 @app.route("/")
 def index():
     if "usuario_id" in session:
-        return redirect(url_for("lista_pessoas"))
+        return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
 
@@ -590,12 +671,12 @@ def login():
 
         usuario = buscar_usuario_por_email(email)
         if not usuario or not check_password_hash(usuario["senha_hash"], senha):
-            flash("E-mail ou senha inválidos.", "error")
+            flash("Usuário ou senha inválidos.", "error")
         else:
             session["usuario_id"] = usuario["id"]
             session["usuario_nome"] = usuario["nome"]
             flash("Login realizado com sucesso.", "success")
-            return redirect(url_for("lista_pessoas"))
+            return redirect(url_for("dashboard"))
 
     conteudo = """
     <h2>Login</h2>
@@ -622,7 +703,7 @@ def logout():
     return redirect(url_for("login"))
 
 
-# ---------- Cadastro de usuário (registro) ----------
+# ---------- Cadastro de usuário ----------
 @app.route("/registrar", methods=["GET", "POST"])
 def registrar():
     if request.method == "POST":
@@ -669,12 +750,141 @@ def registrar():
     return render_page("Cadastro de usuário", conteudo)
 
 
+# ---------- Dashboard ----------
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    conn = get_connection()
+    cur = conn.cursor(dictionary=True)
+
+    # Total de pessoas
+    cur.execute("SELECT COUNT(*) AS total FROM pessoas")
+    row_total = cur.fetchone() or {"total": 0}
+    total_pessoas = row_total["total"]
+
+    # Pessoas por status
+    cur.execute("""
+        SELECT COALESCE(status, 'Não informado') AS status, COUNT(*) AS total
+        FROM pessoas
+        GROUP BY COALESCE(status, 'Não informado')
+        ORDER BY total DESC
+    """)
+    rows_status = cur.fetchall() or []
+
+    # Pessoas por cidade (top 5)
+    cur.execute("""
+        SELECT COALESCE(cidade_origem, 'Não informada') AS cidade, COUNT(*) AS total
+        FROM pessoas
+        GROUP BY COALESCE(cidade_origem, 'Não informada')
+        ORDER BY total DESC
+        LIMIT 5
+    """)
+    rows_cidade = cur.fetchall() or []
+
+    cur.close()
+    conn.close()
+
+    import json as _json
+
+    status_labels = [r["status"] for r in rows_status]
+    status_values = [r["total"] for r in rows_status]
+
+    cidade_labels = [r["cidade"] for r in rows_cidade]
+    cidade_values = [r["total"] for r in rows_cidade]
+
+    conteudo = f"""
+    <h2>Dashboard de cadastros</h2>
+
+    <div class="cards-row">
+        <div class="card-metric">
+            <div class="card-metric-label">Total de pessoas acolhidas</div>
+            <div class="card-metric-value">{total_pessoas}</div>
+            <div class="card-metric-sub">Registros ativos na base</div>
+        </div>
+        <div class="card-metric">
+            <div class="card-metric-label">Situações cadastradas</div>
+            <div class="card-metric-value">{len(status_labels)}</div>
+            <div class="card-metric-sub">Estados diferentes de acompanhamento</div>
+        </div>
+        <div class="card-metric">
+            <div class="card-metric-label">Cidades de origem</div>
+            <div class="card-metric-value">{len(cidade_labels)}</div>
+            <div class="card-metric-sub">Top 5 mais recorrentes</div>
+        </div>
+    </div>
+
+    <div class="charts-row">
+        <div class="chart-card">
+            <h3>Distribuição por status</h3>
+            <canvas id="chartStatus"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>Pessoas por cidade (Top 5)</h3>
+            <canvas id="chartCidade"></canvas>
+        </div>
+    </div>
+
+    <script>
+        (function() {{
+            const statusLabels = {_json.dumps(status_labels, ensure_ascii=False)};
+            const statusValues = {_json.dumps(status_values)};
+            const cidadeLabels = {_json.dumps(cidade_labels, ensure_ascii=False)};
+            const cidadeValues = {_json.dumps(cidade_values)};
+
+            const chartStatusCtx = document.getElementById('chartStatus').getContext('2d');
+            new Chart(chartStatusCtx, {{
+                type: 'doughnut',
+                data: {{
+                    labels: statusLabels,
+                    datasets: [{{
+                        data: statusValues
+                    }}]
+                }},
+                options: {{
+                    plugins: {{
+                        legend: {{
+                            position: 'bottom'
+                        }}
+                    }}
+                }}
+            }});
+
+            const chartCidadeCtx = document.getElementById('chartCidade').getContext('2d');
+            new Chart(chartCidadeCtx, {{
+                type: 'bar',
+                data: {{
+                    labels: cidadeLabels,
+                    datasets: [{{
+                        data: cidadeValues
+                    }}]
+                }},
+                options: {{
+                    plugins: {{
+                        legend: {{ display: false }}
+                    }},
+                    scales: {{
+                        y: {{
+                            beginAtZero: true,
+                            ticks: {{
+                                precision: 0
+                            }}
+                        }}
+                    }}
+                }}
+            }});
+        }})();
+    </script>
+    """
+    return render_page("Dashboard", conteudo)
+
+
 # ---------- Lista de pessoas ----------
 @app.route("/pessoas")
 @login_required
 def lista_pessoas():
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
+
     cur.execute("SELECT * FROM pessoas ORDER BY id DESC")
     pessoas = cur.fetchall()
     cur.close()
@@ -682,31 +892,46 @@ def lista_pessoas():
 
     linhas = []
     for p in pessoas:
+        foto_arquivo = p.get("foto_arquivo")
+        if foto_arquivo:
+            foto_html = f'<img src="{url_for("static", filename="fotos_pessoas/" + foto_arquivo)}" class="photo-thumb" alt="Foto">'
+        else:
+            foto_html = '<div class="photo-thumb-placeholder">sem foto</div>'
+
+        detalhes_link = url_for("detalhes_pessoa", pessoa_id=p["id"])
+
         linhas.append(f"""
             <tr>
+                <td>{foto_html}</td>
                 <td>{p['id']}</td>
                 <td>{p.get('nome') or ''}</td>
                 <td>{p.get('apelido') or ''}</td>
                 <td>{p.get('telefone') or ''}</td>
+                <td>{p.get('cidade_origem') or ''}</td>
                 <td>{p.get('status') or ''}</td>
+                <td><a class="btn btn-secondary" href="{detalhes_link}">Ver detalhes</a></td>
             </tr>
         """)
 
     rows_html = "".join(linhas)
-
     link_nova_pessoa = url_for("nova_pessoa")
 
     conteudo = f"""
     <h2>Pessoas acolhidas</h2>
-    <p><a class="btn btn-primary" href="{link_nova_pessoa}">Novo cadastro</a></p>
+    <p>
+        <a class="btn btn-primary" href="{link_nova_pessoa}">Novo cadastro</a>
+    </p>
     <table>
         <thead>
             <tr>
+                <th>Foto</th>
                 <th>ID</th>
                 <th>Nome</th>
                 <th>Apelido</th>
                 <th>Telefone</th>
+                <th>Cidade de origem</th>
                 <th>Status</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -715,6 +940,109 @@ def lista_pessoas():
     </table>
     """
     return render_page("Pessoas", conteudo)
+
+
+# ---------- Detalhes da pessoa ----------
+@app.route("/pessoas/<int:pessoa_id>")
+@login_required
+def detalhes_pessoa(pessoa_id: int):
+    conn = get_connection()
+    cur = conn.cursor(dictionary=True)
+
+    cur.execute("SELECT * FROM pessoas WHERE id = %s", (pessoa_id,))
+    pessoa = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    if not pessoa:
+        flash("Pessoa não encontrada.", "error")
+        return redirect(url_for("lista_pessoas"))
+
+    foto_arquivo = pessoa.get("foto_arquivo")
+    if foto_arquivo:
+        foto_html = f'<img src="{url_for("static", filename="fotos_pessoas/" + foto_arquivo)}" class="photo-large" alt="Foto">'
+    else:
+        foto_html = '<div class="photo-large-placeholder">Sem foto cadastrada</div>'
+
+    def _fmt(value):
+        return value or ""
+
+    conteudo = f"""
+    <h2>Detalhes da pessoa acolhida</h2>
+    <div class="details-layout">
+        <div>
+            <div class="details-block">
+                <h3>Informações gerais</h3>
+                <div class="details-grid">
+                    <div>
+                        <div class="details-item-label">Nome completo</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("nome"))}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Apelido</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("apelido"))}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Data de nascimento</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("data_nascimento"))}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Documento principal</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("documento_principal"))}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Possui documentos básicos</div>
+                        <div class="details-item-value">{"Sim" if pessoa.get("tem_documentos") else "Não"}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Telefone</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("telefone"))}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Contato de emergência</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("contato_emergencia"))}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Cidade de origem</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("cidade_origem"))}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Status</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("status"))}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Data de cadastro</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("data_cadastro"))}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="details-block">
+                <h3>Histórico e saúde</h3>
+                <div class="details-item-label">Situação de rua desde</div>
+                <div class="details-item-value">{_fmt(pessoa.get("situacao_rua_desde"))}</div>
+                <br>
+                <div class="details-item-label">Resumo de saúde</div>
+                <div class="details-item-value">{_fmt(pessoa.get("saude_resumo"))}</div>
+                <br>
+                <div class="details-item-label">Dependências químicas</div>
+                <div class="details-item-value">{_fmt(pessoa.get("dependencias_quimicas"))}</div>
+                <br>
+                <div class="details-item-label">Observações gerais</div>
+                <div class="details-item-value">{_fmt(pessoa.get("observacoes"))}</div>
+            </div>
+        </div>
+
+        <div>
+            <div class="details-block photo-large-wrapper">
+                {foto_html}
+                <div class="photo-caption">Foto registrada no cadastro</div>
+            </div>
+        </div>
+    </div>
+    """
+    return render_page("Detalhes da pessoa", conteudo)
 
 
 # ---------- Nova pessoa ----------
@@ -734,6 +1062,15 @@ def nova_pessoa():
         saude_resumo = request.form.get("saude_resumo", "").strip() or None
         dependencias_quimicas = request.form.get("dependencias_quimicas", "").strip() or None
         observacoes = request.form.get("observacoes", "").strip() or None
+
+        foto_arquivo = None
+        file = request.files.get("foto")
+        if file and file.filename and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            prefix = datetime.now().strftime("%Y%m%d%H%M%S")
+            filename = f"{prefix}_{filename}"
+            file.save(FOTOS_DIR / filename)
+            foto_arquivo = filename
 
         if not nome:
             flash("Nome é obrigatório.", "warning")
@@ -756,9 +1093,10 @@ def nova_pessoa():
                 dependencias_quimicas,
                 observacoes,
                 status,
-                data_cadastro
+                data_cadastro,
+                foto_arquivo
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             tem_docs_int = 1 if tem_documentos else 0
             valores = (
@@ -776,6 +1114,7 @@ def nova_pessoa():
                 observacoes,
                 "ativo",
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                foto_arquivo,
             )
 
             cur.execute(insert_sql, valores)
@@ -790,79 +1129,90 @@ def nova_pessoa():
 
     conteudo = f"""
     <h2>Novo cadastro de pessoa acolhida</h2>
-    <form method="post">
-        <div class="field">
-            <label>Nome completo *</label>
-            <input type="text" name="nome" required>
+    <form method="post" enctype="multipart/form-data">
+        <div class="field-group">
+            <div class="field">
+                <label>Nome completo *</label>
+                <input type="text" name="nome" required>
+            </div>
+            <div class="field">
+                <label>Apelido</label>
+                <input type="text" name="apelido">
+            </div>
+            <div class="field">
+                <label>Data de nascimento</label>
+                <input type="date" name="data_nascimento">
+            </div>
+            <div class="field">
+                <label>Documento principal (RG/CPF ou outro)</label>
+                <input type="text" name="documento_principal">
+            </div>
         </div>
-        <div class="field">
-            <label>Apelido</label>
-            <input type="text" name="apelido">
+
+        <div class="field-group">
+            <div class="field">
+                <label><input type="checkbox" name="tem_documentos"> Possui documentos básicos</label>
+            </div>
+            <div class="field">
+                <label>Telefone</label>
+                <input type="text" name="telefone">
+            </div>
+            <div class="field">
+                <label>Contato de emergência</label>
+                <input type="text" name="contato_emergencia">
+            </div>
+            <div class="field">
+                <label>Cidade de origem</label>
+                <input type="text" name="cidade_origem">
+            </div>
         </div>
-        <div class="field">
-            <label>Data de nascimento</label>
-            <input type="date" name="data_nascimento">
+
+        <div class="field-group">
+            <div class="field">
+                <label>Situação de rua desde quando?</label>
+                <textarea name="situacao_rua_desde"></textarea>
+            </div>
+            <div class="field">
+                <label>Resumo de saúde (doenças, medicações, etc.)</label>
+                <textarea name="saude_resumo"></textarea>
+            </div>
         </div>
-        <div class="field">
-            <label>Documento principal (RG/CPF ou outro)</label>
-            <input type="text" name="documento_principal">
+
+        <div class="field-group">
+            <div class="field">
+                <label>Dependências químicas</label>
+                <textarea name="dependencias_quimicas"></textarea>
+            </div>
+            <div class="field">
+                <label>Observações gerais</label>
+                <textarea name="observacoes"></textarea>
+            </div>
         </div>
-        <div class="field">
-            <label><input type="checkbox" name="tem_documentos"> Possui documentos básicos</label>
+
+        <div class="field-group">
+            <div class="field">
+                <label>Foto da pessoa (opcional)</label>
+                <input type="file" name="foto" accept="image/*">
+            </div>
         </div>
-        <div class="field">
-            <label>Telefone</label>
-            <input type="text" name="telefone">
+
+        <div style="margin-top: 10px; display:flex; gap: 8px;">
+            <button type="submit" class="btn btn-primary">Salvar cadastro</button>
+            <a href="{link_lista}" class="btn btn-secondary">Voltar para lista</a>
         </div>
-        <div class="field">
-            <label>Contato de emergência</label>
-            <input type="text" name="contato_emergencia">
-        </div>
-        <div class="field">
-            <label>Cidade de origem</label>
-            <input type="text" name="cidade_origem">
-        </div>
-        <div class="field">
-            <label>Em situação de rua desde quando?</label>
-            <textarea name="situacao_rua_desde" rows="2"></textarea>
-        </div>
-        <div class="field">
-            <label>Resumo da situação de saúde</label>
-            <textarea name="saude_resumo" rows="3"></textarea>
-        </div>
-        <div class="field">
-            <label>Dependências químicas</label>
-            <textarea name="dependencias_quimicas" rows="2"></textarea>
-        </div>
-        <div class="field">
-            <label>Observações gerais</label>
-            <textarea name="observacoes" rows="3"></textarea>
-        </div>
-        <button type="submit" class="btn btn-primary">Salvar</button>
-        <a href="{link_lista}" class="btn btn-secondary">Voltar</a>
     </form>
     """
-    return render_page("Nova pessoa", conteudo)
+    return render_page("Novo cadastro", conteudo)
 
 
-
-
-# %%
 # ============================================================
-# ▶️ Rodar app
-
-
-# %%
+# ▶️ Rodar app (para desenvolvimento local)
 # ============================================================
 
 if __name__ == "__main__":
-    # Em notebook, é melhor sem reloader
+    port = int(os.environ.get("PORT", 5000))
     app.run(
         debug=True,
         host="0.0.0.0",
-        port=5000,
-        use_reloader=False,
+        port=port,
     )
-
-
-
