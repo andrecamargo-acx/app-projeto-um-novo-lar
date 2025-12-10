@@ -16,6 +16,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from functools import wraps
 import mysql.connector
+import google.generativeai as genai
+import json as pyjson
 
 # ============================================================
 # ⚙️ Configuração do MySQL
@@ -71,6 +73,139 @@ ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+# ============================================================
+# 🤖 Configuração do GEMINI
+# ============================================================
+
+GEMINI_API_KEY = os.getenv(
+    "GEMINI_API_KEY",
+    "AIzaSyBzGnwcfhIQT_ix-uD756HuTkEj58FmXKc",  # MVP: key fixa
+)
+
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+else:
+    gemini_model = None
+
+
+def gerar_resumo_pessoa_ia(pessoa: dict) -> str:
+    """
+    Gera um resumo textual da situação da pessoa usando GEMINI.
+    """
+    if not gemini_model:
+        return "IA não configurada (GEMINI_API_KEY ausente)."
+
+    contexto = f"""
+Nome: {pessoa.get('nome') or 'Não informado'}
+Gênero: {pessoa.get('genero') or 'Não informado'}
+Data de nascimento: {pessoa.get('data_nascimento') or 'Não informada'}
+Cidade de origem: {pessoa.get('cidade_origem') or 'Não informada'}
+Situação de rua desde: {pessoa.get('situacao_rua_desde') or 'Não informada'}
+Resumo de saúde: {pessoa.get('saude_resumo') or 'Não informado'}
+Dependências químicas: {pessoa.get('dependencias_quimicas') or 'Não informado'}
+Rede de apoio: {pessoa.get('rede_apoio') or 'Não informada'}
+Profissão anterior: {pessoa.get('profissao_anterior') or 'Não informado'}
+Observações gerais: {pessoa.get('observacoes') or 'Sem observações'}
+"""
+
+    prompt = f"""
+Você é um assistente social que escreve resumos de forma empática e objetiva.
+
+Abaixo estão informações estruturadas sobre uma pessoa acolhida.
+Gere um resumo em português, claro e humano, em até 2 parágrafos, destacando:
+- contexto geral da pessoa
+- pontos de atenção (saúde, documentos, dependência, rede de apoio)
+- sem fazer diagnósticos médicos, apenas descrevendo a situação.
+
+Texto para analisar:
+{contexto}
+"""
+
+    resp = gemini_model.generate_content(prompt)
+    return (resp.text or "").strip()
+
+
+def classificar_pessoa_ia(pessoa: dict) -> dict:
+    """
+    Classifica prioridade e temas principais a partir dos dados da pessoa,
+    retornando um dicionário com:
+      - prioridade: 'alta' | 'media' | 'baixa'
+      - tags: string separada por ponto e vírgula
+      - proximos_passos: texto explicativo
+    """
+    if not gemini_model:
+        return {
+            "prioridade": "desconhecida",
+            "tags": "",
+            "proximos_passos": "IA não configurada (GEMINI_API_KEY ausente).",
+        }
+
+    contexto = f"""
+Gênero: {pessoa.get('genero') or 'Não informado'}
+Idade/Data de nascimento: {pessoa.get('data_nascimento') or 'Não informada'}
+Cidade de origem: {pessoa.get('cidade_origem') or 'Não informada'}
+Situação de rua desde: {pessoa.get('situacao_rua_desde') or 'Não informada'}
+Resumo de saúde: {pessoa.get('saude_resumo') or 'Não informado'}
+Dependências químicas: {pessoa.get('dependencias_quimicas') or 'Não informado'}
+Possui documentos básicos: {"Sim" if pessoa.get("tem_documentos") else "Não"}
+Rede de apoio: {pessoa.get('rede_apoio') or 'Não informada'}
+Profissão anterior: {pessoa.get('profissao_anterior') or 'Não informado'}
+Observações gerais: {pessoa.get('observacoes') or 'Sem observações'}
+"""
+
+    prompt = f"""
+Você é um profissional de assistência social que analisa casos de pessoas em situação de vulnerabilidade.
+
+Analise as informações abaixo e responda ESTRITAMENTE em JSON, sem texto fora do JSON, no seguinte formato:
+
+{{
+  "prioridade": "alta" | "media" | "baixa",
+  "tags": ["tag1", "tag2", ...],
+  "proximos_passos": "texto em português com sugestões de próximos passos"
+}}
+
+As tags devem ser palavras curtas em snake_case, por exemplo:
+["saude_mental", "dependencia_quimica", "sem_documentos", "sem_rede_apoio"]
+
+Informações da pessoa:
+{contexto}
+"""
+
+    resp = gemini_model.generate_content(prompt)
+    texto = (resp.text or "").strip()
+
+    # Tentativa de remover possíveis delimitadores de código
+    if texto.startswith("```"):
+        texto = texto.strip("`")
+        if "\n" in texto:
+            texto = "\n".join(texto.split("\n")[1:])
+
+    try:
+        data = pyjson.loads(texto)
+    except Exception:
+        return {
+            "prioridade": "desconhecida",
+            "tags": "",
+            "proximos_passos": "Não foi possível interpretar a resposta da IA.",
+        }
+
+    prioridade = data.get("prioridade", "desconhecida")
+    tags_list = data.get("tags", [])
+    if isinstance(tags_list, list):
+        tags_str = ";".join(str(t) for t in tags_list)
+    else:
+        tags_str = str(tags_list)
+
+    proximos_passos = data.get("proximos_passos", "")
+
+    return {
+        "prioridade": prioridade,
+        "tags": tags_str,
+        "proximos_passos": proximos_passos,
+    }
 
 
 # ============================================================
@@ -564,7 +699,7 @@ layout_base = """
 
         .card-metric-sub {
             font-size: 11px;
-            color: var(--text-muted);
+            color: #6b7280;
         }
 
         .charts-row {
@@ -800,13 +935,12 @@ def dashboard():
     cur.close()
     conn.close()
 
-    import json as _json
-
     status_labels = [r["status"] for r in rows_status]
     status_values = [r["total"] for r in rows_status]
-
     cidade_labels = [r["cidade"] for r in rows_cidade]
     cidade_values = [r["total"] for r in rows_cidade]
+
+    import json as _json
 
     conteudo = f"""
     <h2>Dashboard de cadastros</h2>
@@ -916,7 +1050,8 @@ def lista_pessoas():
     for p in pessoas:
         foto_arquivo = p.get("foto_arquivo")
         if foto_arquivo:
-            foto_html = f'<img src="{url_for("static", filename="fotos_pessoas/" + foto_arquivo)}" class="photo-thumb" alt="Foto">'
+            foto_url = url_for("static", filename="fotos_pessoas/" + foto_arquivo)
+            foto_html = f'<img src="{foto_url}" class="photo-thumb" alt="Foto">'
         else:
             foto_html = '<div class="photo-thumb-placeholder">sem foto</div>'
 
@@ -990,11 +1125,47 @@ def detalhes_pessoa(pessoa_id: int):
     def _fmt(value):
         return value or ""
 
+    resumo_ia = session.pop("resumo_ia", None)
+    sugestao_ia = session.pop("sugestao_ia", None)
+
+    resumo_ia_html = ""
+    if resumo_ia:
+        resumo_ia_html = f"""
+        <div class="details-block" style="border-left: 4px solid #1c75ff;">
+            <h3>Resumo com IA</h3>
+            <p style="white-space: pre-line; font-size:13px;">{resumo_ia}</p>
+        </div>
+        """
+
+    sugestao_ia_html = ""
+    if sugestao_ia:
+        sugestao_ia_html = f"""
+        <div class="details-block" style="border-left: 4px solid #00b894;">
+            <h3>Sugestões de próximos passos (IA)</h3>
+            <p style="white-space: pre-line; font-size:13px;">{sugestao_ia}</p>
+        </div>
+        """
+
     inativar_link = url_for("inativar_pessoa", pessoa_id=pessoa_id)
     voltar_link = url_for("lista_pessoas")
+    resumo_ia_link = url_for("resumo_pessoa_ia", pessoa_id=pessoa_id)
+    classificar_ia_link = url_for("classificar_pessoa_ia_route", pessoa_id=pessoa_id)
 
     conteudo = f"""
     <h2>Detalhes da pessoa acolhida</h2>
+
+    <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+        <form method="post" action="{resumo_ia_link}">
+            <button type="submit" class="btn btn-primary">Gerar resumo com IA</button>
+        </form>
+        <form method="post" action="{classificar_ia_link}">
+            <button type="submit" class="btn btn-secondary">Classificar e sugerir próximos passos (IA)</button>
+        </form>
+    </div>
+
+    {resumo_ia_html}
+    {sugestao_ia_html}
+
     <div class="details-layout">
         <div>
             <div class="details-block">
@@ -1055,6 +1226,14 @@ def detalhes_pessoa(pessoa_id: int):
                     <div>
                         <div class="details-item-label">Data de cadastro</div>
                         <div class="details-item-value">{_fmt(pessoa.get("data_cadastro"))}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Prioridade (IA)</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("prioridade_ia"))}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Tags (IA)</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("tags_ia"))}</div>
                     </div>
                 </div>
             </div>
@@ -1118,6 +1297,78 @@ def inativar_pessoa(pessoa_id: int):
 
     flash("Cadastro marcado como inativo.", "success")
     return redirect(url_for("lista_pessoas"))
+
+
+# ---------- Gerar resumo IA ----------
+@app.route("/pessoas/<int:pessoa_id>/resumo_ia", methods=["POST"])
+@login_required
+def resumo_pessoa_ia(pessoa_id: int):
+    conn = get_connection()
+    cur = conn.cursor(dictionary=True)
+    cur.execute("SELECT * FROM pessoas WHERE id = %s", (pessoa_id,))
+    pessoa = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if not pessoa:
+        flash("Pessoa não encontrada para gerar resumo.", "error")
+        return redirect(url_for("lista_pessoas"))
+
+    try:
+        resumo = gerar_resumo_pessoa_ia(pessoa)
+        flash("Resumo gerado com IA.", "success")
+    except Exception as e:
+        resumo = f"Erro ao chamar IA: {e}"
+        flash("Não foi possível gerar o resumo com IA.", "error")
+
+    session["resumo_ia"] = resumo
+    return redirect(url_for("detalhes_pessoa", pessoa_id=pessoa_id))
+
+
+# ---------- Classificar IA ----------
+@app.route("/pessoas/<int:pessoa_id>/classificar_ia", methods=["POST"])
+@login_required
+def classificar_pessoa_ia_route(pessoa_id: int):
+    conn = get_connection()
+    cur = conn.cursor(dictionary=True)
+    cur.execute("SELECT * FROM pessoas WHERE id = %s", (pessoa_id,))
+    pessoa = cur.fetchone()
+    cur.close()
+
+    if not pessoa:
+        conn.close()
+        flash("Pessoa não encontrada para classificação IA.", "error")
+        return redirect(url_for("lista_pessoas"))
+
+    try:
+        resultado = classificar_pessoa_ia(pessoa)
+        prioridade = resultado.get("prioridade", "desconhecida")
+        tags = resultado.get("tags", "")
+        proximos_passos = resultado.get("proximos_passos", "")
+    except Exception as e:
+        conn.close()
+        session["sugestao_ia"] = f"Erro ao chamar IA: {e}"
+        flash("Não foi possível classificar com IA.", "error")
+        return redirect(url_for("detalhes_pessoa", pessoa_id=pessoa_id))
+
+    # Atualiza na tabela
+    cur2 = conn.cursor()
+    try:
+        cur2.execute(
+            "UPDATE pessoas SET prioridade_ia = %s, tags_ia = %s WHERE id = %s",
+            (prioridade, tags, pessoa_id),
+        )
+        conn.commit()
+        flash("Classificação IA atualizada no cadastro.", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"Erro ao salvar classificação IA no banco: {e}", "error")
+    finally:
+        cur2.close()
+        conn.close()
+
+    session["sugestao_ia"] = proximos_passos or "Classificação IA realizada."
+    return redirect(url_for("detalhes_pessoa", pessoa_id=pessoa_id))
 
 
 # ---------- Nova pessoa ----------
