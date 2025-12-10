@@ -134,7 +134,7 @@ def login_required(f):
 
 
 # ============================================================
-# 🎨 Layout base (v2) – logo maior e fundo branco
+# 🎨 Layout base (logo maior, fundo branco)
 # ============================================================
 
 layout_base = """
@@ -208,13 +208,13 @@ layout_base = """
             width: 64px;
             height: 64px;
             border-radius: 14px;
-            background: #ffffff;            /* fundo branco, sem degradê */
+            background: #ffffff;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
-            border: 1px solid #e5e7eb;      /* borda leve */
-            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.15);  /* leve destaque */
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.15);
         }
 
         .brand-logo img {
@@ -224,7 +224,7 @@ layout_base = """
         }
 
         .brand-text-title {
-            font-size: 20px;               /* um pouco maior */
+            font-size: 20px;
             font-weight: 700;
             letter-spacing: 0.04em;
             text-transform: uppercase;
@@ -360,6 +360,15 @@ layout_base = """
             background: #d1d5db;
         }
 
+        .btn-danger {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .btn-danger:hover {
+            background: #fecaca;
+        }
+
         .field-group {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -382,6 +391,7 @@ layout_base = """
         input[type=text],
         input[type=password],
         input[type=date],
+        input[type=number],
         textarea,
         select {
             width: 100%;
@@ -757,24 +767,30 @@ def dashboard():
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
 
-    # Total de pessoas
-    cur.execute("SELECT COUNT(*) AS total FROM pessoas")
+    # Total de pessoas ativas (status != 'inativo')
+    cur.execute("""
+        SELECT COUNT(*) AS total
+        FROM pessoas
+        WHERE status <> 'inativo' OR status IS NULL
+    """)
     row_total = cur.fetchone() or {"total": 0}
     total_pessoas = row_total["total"]
 
-    # Pessoas por status
+    # Pessoas por status (apenas ativos)
     cur.execute("""
         SELECT COALESCE(status, 'Não informado') AS status, COUNT(*) AS total
         FROM pessoas
+        WHERE status <> 'inativo' OR status IS NULL
         GROUP BY COALESCE(status, 'Não informado')
         ORDER BY total DESC
     """)
     rows_status = cur.fetchall() or []
 
-    # Pessoas por cidade (top 5)
+    # Pessoas por cidade (top 5) – apenas ativos
     cur.execute("""
         SELECT COALESCE(cidade_origem, 'Não informada') AS cidade, COUNT(*) AS total
         FROM pessoas
+        WHERE status <> 'inativo' OR status IS NULL
         GROUP BY COALESCE(cidade_origem, 'Não informada')
         ORDER BY total DESC
         LIMIT 5
@@ -797,7 +813,7 @@ def dashboard():
 
     <div class="cards-row">
         <div class="card-metric">
-            <div class="card-metric-label">Total de pessoas acolhidas</div>
+            <div class="card-metric-label">Total de pessoas acolhidas (ativas)</div>
             <div class="card-metric-value">{total_pessoas}</div>
             <div class="card-metric-sub">Registros ativos na base</div>
         </div>
@@ -815,7 +831,7 @@ def dashboard():
 
     <div class="charts-row">
         <div class="chart-card">
-            <h3>Distribuição por status</h3>
+            <h3>Distribuição por status (ativos)</h3>
             <canvas id="chartStatus"></canvas>
         </div>
         <div class="chart-card">
@@ -885,7 +901,13 @@ def lista_pessoas():
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
 
-    cur.execute("SELECT * FROM pessoas ORDER BY id DESC")
+    # Só mostra quem não está inativo
+    cur.execute("""
+        SELECT *
+        FROM pessoas
+        WHERE status <> 'inativo' OR status IS NULL
+        ORDER BY id DESC
+    """)
     pessoas = cur.fetchall()
     cur.close()
     conn.close()
@@ -968,6 +990,9 @@ def detalhes_pessoa(pessoa_id: int):
     def _fmt(value):
         return value or ""
 
+    inativar_link = url_for("inativar_pessoa", pessoa_id=pessoa_id)
+    voltar_link = url_for("lista_pessoas")
+
     conteudo = f"""
     <h2>Detalhes da pessoa acolhida</h2>
     <div class="details-layout">
@@ -982,6 +1007,22 @@ def detalhes_pessoa(pessoa_id: int):
                     <div>
                         <div class="details-item-label">Apelido</div>
                         <div class="details-item-value">{_fmt(pessoa.get("apelido"))}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Gênero</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("genero"))}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Estado civil</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("estado_civil"))}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Escolaridade</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("escolaridade"))}</div>
+                    </div>
+                    <div>
+                        <div class="details-item-label">Quantidade de filhos</div>
+                        <div class="details-item-value">{_fmt(pessoa.get("qtd_filhos"))}</div>
                     </div>
                     <div>
                         <div class="details-item-label">Data de nascimento</div>
@@ -1019,6 +1060,18 @@ def detalhes_pessoa(pessoa_id: int):
             </div>
 
             <div class="details-block">
+                <h3>Contexto familiar e trabalho</h3>
+                <div class="details-item-label">Profissão anterior</div>
+                <div class="details-item-value">{_fmt(pessoa.get("profissao_anterior"))}</div>
+                <br>
+                <div class="details-item-label">Renda mensal aproximada</div>
+                <div class="details-item-value">{_fmt(pessoa.get("renda_mensal_aprox"))}</div>
+                <br>
+                <div class="details-item-label">Rede de apoio (família, amigos, instituições)</div>
+                <div class="details-item-value">{_fmt(pessoa.get("rede_apoio"))}</div>
+            </div>
+
+            <div class="details-block">
                 <h3>Histórico e saúde</h3>
                 <div class="details-item-label">Situação de rua desde</div>
                 <div class="details-item-value">{_fmt(pessoa.get("situacao_rua_desde"))}</div>
@@ -1031,6 +1084,13 @@ def detalhes_pessoa(pessoa_id: int):
                 <br>
                 <div class="details-item-label">Observações gerais</div>
                 <div class="details-item-value">{_fmt(pessoa.get("observacoes"))}</div>
+            </div>
+
+            <div style="margin-top: 10px; display:flex; gap: 8px;">
+                <a href="{voltar_link}" class="btn btn-secondary">Voltar para lista</a>
+                <form method="post" action="{inativar_link}" onsubmit="return confirm('Tem certeza que deseja marcar este cadastro como inativo?');">
+                    <button type="submit" class="btn btn-danger">Marcar como inativo</button>
+                </form>
             </div>
         </div>
 
@@ -1045,6 +1105,21 @@ def detalhes_pessoa(pessoa_id: int):
     return render_page("Detalhes da pessoa", conteudo)
 
 
+# ---------- Marcar como inativo (soft delete) ----------
+@app.route("/pessoas/<int:pessoa_id>/inativar", methods=["POST"])
+@login_required
+def inativar_pessoa(pessoa_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE pessoas SET status = %s WHERE id = %s", ("inativo", pessoa_id))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    flash("Cadastro marcado como inativo.", "success")
+    return redirect(url_for("lista_pessoas"))
+
+
 # ---------- Nova pessoa ----------
 @app.route("/pessoas/nova", methods=["GET", "POST"])
 @login_required
@@ -1053,11 +1128,23 @@ def nova_pessoa():
         nome = request.form.get("nome", "").strip()
         apelido = request.form.get("apelido", "").strip() or None
         data_nascimento = request.form.get("data_nascimento") or None
+
+        genero = request.form.get("genero", "").strip() or None
+        estado_civil = request.form.get("estado_civil", "").strip() or None
+        escolaridade = request.form.get("escolaridade", "").strip() or None
+        qtd_filhos_str = request.form.get("qtd_filhos", "").strip()
+        qtd_filhos = int(qtd_filhos_str) if qtd_filhos_str else None
+
         documento_principal = request.form.get("documento_principal", "").strip() or None
         tem_documentos = request.form.get("tem_documentos") == "on"
         telefone = request.form.get("telefone", "").strip() or None
         contato_emergencia = request.form.get("contato_emergencia", "").strip() or None
         cidade_origem = request.form.get("cidade_origem", "").strip() or None
+
+        profissao_anterior = request.form.get("profissao_anterior", "").strip() or None
+        renda_mensal_aprox = request.form.get("renda_mensal_aprox", "").strip() or None
+        rede_apoio = request.form.get("rede_apoio", "").strip() or None
+
         situacao_rua_desde = request.form.get("situacao_rua_desde", "").strip() or None
         saude_resumo = request.form.get("saude_resumo", "").strip() or None
         dependencias_quimicas = request.form.get("dependencias_quimicas", "").strip() or None
@@ -1083,11 +1170,18 @@ def nova_pessoa():
                 nome,
                 apelido,
                 data_nascimento,
+                genero,
+                estado_civil,
+                escolaridade,
+                qtd_filhos,
                 documento_principal,
                 tem_documentos,
                 telefone,
                 contato_emergencia,
                 cidade_origem,
+                profissao_anterior,
+                renda_mensal_aprox,
+                rede_apoio,
                 situacao_rua_desde,
                 saude_resumo,
                 dependencias_quimicas,
@@ -1096,18 +1190,25 @@ def nova_pessoa():
                 data_cadastro,
                 foto_arquivo
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             tem_docs_int = 1 if tem_documentos else 0
             valores = (
                 nome,
                 apelido,
                 data_nascimento or None,
+                genero,
+                estado_civil,
+                escolaridade,
+                qtd_filhos,
                 documento_principal,
                 tem_docs_int,
                 telefone,
                 contato_emergencia,
                 cidade_origem,
+                profissao_anterior,
+                renda_mensal_aprox,
+                rede_apoio,
                 situacao_rua_desde,
                 saude_resumo,
                 dependencias_quimicas,
@@ -1144,6 +1245,22 @@ def nova_pessoa():
                 <input type="date" name="data_nascimento">
             </div>
             <div class="field">
+                <label>Gênero</label>
+                <input type="text" name="genero" placeholder="Masculino, feminino, não-binário, etc.">
+            </div>
+            <div class="field">
+                <label>Estado civil</label>
+                <input type="text" name="estado_civil">
+            </div>
+            <div class="field">
+                <label>Escolaridade</label>
+                <input type="text" name="escolaridade" placeholder="Fundamental, médio, superior, etc.">
+            </div>
+            <div class="field">
+                <label>Quantidade de filhos</label>
+                <input type="number" name="qtd_filhos" min="0">
+            </div>
+            <div class="field">
                 <label>Documento principal (RG/CPF ou outro)</label>
                 <input type="text" name="documento_principal">
             </div>
@@ -1164,6 +1281,21 @@ def nova_pessoa():
             <div class="field">
                 <label>Cidade de origem</label>
                 <input type="text" name="cidade_origem">
+            </div>
+        </div>
+
+        <div class="field-group">
+            <div class="field">
+                <label>Profissão anterior</label>
+                <input type="text" name="profissao_anterior" placeholder="Última ocupação/trabalho">
+            </div>
+            <div class="field">
+                <label>Renda mensal aproximada</label>
+                <input type="text" name="renda_mensal_aprox" placeholder="Valor ou faixa">
+            </div>
+            <div class="field">
+                <label>Rede de apoio (família, amigos, instituições)</label>
+                <textarea name="rede_apoio"></textarea>
             </div>
         </div>
 
