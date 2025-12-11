@@ -86,7 +86,7 @@ GEMINI_API_KEY = os.getenv(
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel("gemini-2.5-flash")
+    gemini_model = genai.GenerativeModel("gemini-1.5-flash")
 else:
     gemini_model = None
 
@@ -177,7 +177,6 @@ Informações da pessoa:
     resp = gemini_model.generate_content(prompt)
     texto = (resp.text or "").strip()
 
-    # Tentativa de remover possíveis delimitadores de código
     if texto.startswith("```"):
         texto = texto.strip("`")
         if "\n" in texto:
@@ -299,19 +298,19 @@ layout_base = """
             --success: #2ecc71;
         }
 
-        * {
+        * {{
             box-sizing: border-box;
-        }
+        }}
 
-        body {
+        body {{
             margin: 0;
             padding: 24px;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             background: linear-gradient(135deg, var(--bg-gradient-start), var(--bg-gradient-end));
             color: var(--text-main);
-        }
+        }}
 
-        .app-shell {
+        .app-shell {{
             max-width: 1100px;
             margin: 0 auto;
             background: #ffffff;
@@ -321,9 +320,9 @@ layout_base = """
                 0 18px 35px rgba(15, 35, 95, 0.08),
                 0 0 0 1px rgba(15, 23, 42, 0.04);
             border: 1px solid rgba(148, 163, 184, 0.3);
-        }
+        }}
 
-        .topbar {
+        .topbar {{
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -331,15 +330,15 @@ layout_base = """
             margin-bottom: 18px;
             padding-bottom: 14px;
             border-bottom: 1px solid var(--border-subtle);
-        }
+        }}
 
-        .brand {
+        .brand {{
             display: flex;
             align-items: center;
             gap: 12px;
-        }
+        }}
 
-        .brand-logo {
+        .brand-logo {{
             width: 64px;
             height: 64px;
             border-radius: 14px;
@@ -350,41 +349,41 @@ layout_base = """
             overflow: hidden;
             border: 1px solid #e5e7eb;
             box-shadow: 0 4px 10px rgba(15, 23, 42, 0.15);
-        }
+        }}
 
-        .brand-logo img {
+        .brand-logo img {{
             width: 90%;
             height: 90%;
             object-fit: contain;
-        }
+        }}
 
-        .brand-text-title {
+        .brand-text-title {{
             font-size: 20px;
             font-weight: 700;
             letter-spacing: 0.04em;
             text-transform: uppercase;
-        }
+        }}
 
-        .brand-text-subtitle {
+        .brand-text-subtitle {{
             font-size: 12px;
             color: var(--text-muted);
-        }
+        }}
 
-        .user-info {
+        .user-info {{
             font-size: 13px;
             color: var(--text-muted);
             margin-bottom: 4px;
             text-align: right;
-        }
+        }}
 
-        .menu {
+        .menu {{
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
             justify-content: flex-end;
-        }
+        }}
 
-        .menu a {
+        .menu a {{
             font-size: 13px;
             padding: 6px 12px;
             border-radius: 999px;
@@ -393,29 +392,29 @@ layout_base = """
             color: var(--text-main);
             background: #f3f4ff;
             transition: all 0.15s ease;
-        }
+        }}
 
-        .menu a:hover {
+        .menu a:hover {{
             background: #e0e7ff;
             border-color: var(--primary-light);
-        }
+        }}
 
-        .menu a.menu-primary {
+        .menu a.menu-primary {{
             background: var(--primary);
             color: #ffffff;
             border-color: var(--primary-dark);
             box-shadow: 0 6px 14px rgba(37, 99, 235, 0.4);
-        }
+        }}
 
-        .menu a.menu-primary:hover {
+        .menu a.menu-primary:hover {{
             background: var(--primary-dark);
-        }
+        }}
 
-        .flash-container {
+        .flash-container {{
             margin-bottom: 12px;
-        }
+        }}
 
-        .flash {
+        .flash {{
             padding: 10px 12px;
             margin-bottom: 8px;
             border-radius: 10px;
@@ -424,45 +423,45 @@ layout_base = """
             align-items: flex-start;
             gap: 8px;
             border: 1px solid transparent;
-        }
+        }}
 
-        .flash-success {
+        .flash-success {{
             background: #ecfdf3;
             border-color: #bbf7d0;
             color: #166534;
-        }
+        }}
 
-        .flash-warning {
+        .flash-warning {{
             background: #fffbeb;
             border-color: #facc15;
             color: #92400e;
-        }
+        }}
 
-        .flash-error {
+        .flash-error {{
             background: #fef2f2;
             border-color: #fecaca;
             color: #b91c1c;
-        }
+        }}
 
-        .content-card {
+        .content-card {{
             margin-top: 6px;
             padding: 16px 18px 20px;
             border-radius: 16px;
             background: #f9fafb;
             border: 1px solid #e5e7eb;
-        }
+        }}
 
-        h1, h2, h3 {
+        h1, h2, h3 {{
             margin-top: 0;
             color: var(--text-main);
-        }
+        }}
 
-        h2 {
+        h2 {{
             font-size: 20px;
             margin-bottom: 14px;
-        }
+        }}
 
-        .btn {
+        .btn {{
             padding: 7px 13px;
             border-radius: 999px;
             border: none;
@@ -473,62 +472,62 @@ layout_base = """
             align-items: center;
             gap: 6px;
             transition: all 0.15s ease;
-        }
+        }}
 
-        .btn-primary {
+        .btn-primary {{
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: #ffffff;
             box-shadow: 0 8px 16px rgba(37, 99, 235, 0.4);
-        }
+        }}
 
-        .btn-primary:hover {
+        .btn-primary:hover {{
             transform: translateY(-1px);
             box-shadow: 0 10px 22px rgba(37, 99, 235, 0.5);
-        }
+        }}
 
-        .btn-secondary {
+        .btn-secondary {{
             background: #e5e7eb;
             color: #111827;
-        }
+        }}
 
-        .btn-secondary:hover {
+        .btn-secondary:hover {{
             background: #d1d5db;
-        }
+        }}
 
-        .btn-danger {
+        .btn-danger {{
             background: #fee2e2;
             color: #b91c1c;
-        }
+        }}
 
-        .btn-danger:hover {
+        .btn-danger:hover {{
             background: #fecaca;
-        }
+        }}
 
-        .field-group {
+        .field-group {{
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 12px 16px;
             margin-bottom: 12px;
-        }
+        }}
 
-        .field {
+        .field {{
             display: flex;
             flex-direction: column;
             gap: 4px;
-        }
+        }}
 
-        label {
+        label {{
             font-weight: 600;
             font-size: 13px;
             color: var(--text-main);
-        }
+        }}
 
         input[type=text],
         input[type=password],
         input[type=date],
         input[type=number],
         textarea,
-        select {
+        select {{
             width: 100%;
             padding: 7px 9px;
             border-radius: 9px;
@@ -537,21 +536,21 @@ layout_base = """
             outline: none;
             transition: all 0.15s ease;
             background: #ffffff;
-        }
+        }}
 
         input:focus,
         textarea:focus,
-        select:focus {
+        select:focus {{
             border-color: var(--primary);
             box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
-        }
+        }}
 
-        textarea {
+        textarea {{
             min-height: 70px;
             resize: vertical;
-        }
+        }}
 
-        table {
+        table {{
             width: 100%;
             border-collapse: collapse;
             margin-top: 8px;
@@ -560,34 +559,34 @@ layout_base = """
             border-radius: 12px;
             overflow: hidden;
             border: 1px solid #e5e7eb;
-        }
+        }}
 
-        th, td {
+        th, td {{
             padding: 8px 10px;
             border-bottom: 1px solid #e5e7eb;
-        }
+        }}
 
-        thead {
+        thead {{
             background: linear-gradient(135deg, #eff6ff, #e0f2fe);
-        }
+        }}
 
-        tbody tr:nth-child(even) {
+        tbody tr:nth-child(even) {{
             background: #f9fafb;
-        }
+        }}
 
-        tbody tr:hover {
+        tbody tr:hover {{
             background: #e5f1ff;
-        }
+        }}
 
-        .photo-thumb {
+        .photo-thumb {{
             width: 40px;
             height: 40px;
             border-radius: 999px;
             object-fit: cover;
             border: 2px solid #e5e7eb;
-        }
+        }}
 
-        .photo-thumb-placeholder {
+        .photo-thumb-placeholder {{
             width: 40px;
             height: 40px;
             border-radius: 999px;
@@ -597,50 +596,50 @@ layout_base = """
             justify-content: center;
             font-size: 9px;
             color: #9ca3af;
-        }
+        }}
 
-        .details-layout {
+        .details-layout {{
             display: grid;
             grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
             gap: 18px;
-        }
+        }}
 
-        .details-block {
+        .details-block {{
             background: #ffffff;
             border-radius: 12px;
             padding: 12px 14px;
             border: 1px solid #e5e7eb;
             margin-bottom: 8px;
-        }
+        }}
 
-        .details-block h3 {
+        .details-block h3 {{
             font-size: 14px;
             margin-bottom: 6px;
-        }
+        }}
 
-        .details-grid {
+        .details-grid {{
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 8px 16px;
-        }
+        }}
 
-        .details-item-label {
+        .details-item-label {{
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.06em;
             color: var(--text-muted);
-        }
+        }}
 
-        .details-item-value {
+        .details-item-value {{
             font-size: 13px;
             font-weight: 500;
-        }
+        }}
 
-        .photo-large-wrapper {
+        .photo-large-wrapper {{
             text-align: center;
-        }
+        }}
 
-        .photo-large {
+        .photo-large {{
             width: 160px;
             height: 160px;
             border-radius: 24px;
@@ -650,9 +649,9 @@ layout_base = """
                 0 15px 30px rgba(15, 35, 95, 0.25),
                 0 0 0 1px rgba(148, 163, 184, 0.4);
             margin-bottom: 8px;
-        }
+        }}
 
-        .photo-large-placeholder {
+        .photo-large-placeholder {{
             width: 160px;
             height: 160px;
             border-radius: 24px;
@@ -663,82 +662,82 @@ layout_base = """
             font-size: 11px;
             color: #9ca3af;
             margin-bottom: 8px;
-        }
+        }}
 
-        .photo-caption {
+        .photo-caption {{
             font-size: 11px;
             color: var(--text-muted);
-        }
+        }}
 
-        .cards-row {
+        .cards-row {{
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 12px;
             margin-bottom: 16px;
-        }
+        }}
 
-        .card-metric {
+        .card-metric {{
             padding: 10px 12px;
             border-radius: 14px;
             border: 1px solid #e5e7eb;
             background: #ffffff;
-        }
+        }}
 
-        .card-metric-label {
+        .card-metric-label {{
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.08em;
             color: var(--text-muted);
-        }
+        }}
 
-        .card-metric-value {
+        .card-metric-value {{
             font-size: 20px;
             font-weight: 700;
             margin-top: 4px;
-        }
+        }}
 
-        .card-metric-sub {
+        .card-metric-sub {{
             font-size: 11px;
             color: #6b7280;
-        }
+        }}
 
-        .charts-row {
+        .charts-row {{
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
             gap: 16px;
             margin-top: 8px;
-        }
+        }}
 
-        .chart-card {
+        .chart-card {{
             background: #ffffff;
             border-radius: 14px;
             padding: 10px 12px;
             border: 1px solid #e5e7eb;
-        }
+        }}
 
-        .chart-card h3 {
+        .chart-card h3 {{
             font-size: 13px;
             margin-bottom: 6px;
-        }
+        }}
 
-        @media (max-width: 720px) {
-            body {
+        @media (max-width: 720px) {{
+            body {{
                 padding: 10px;
-            }
-            .app-shell {
+            }}
+            .app-shell {{
                 padding: 14px 14px 18px;
-            }
-            .topbar {
+            }}
+            .topbar {{
                 flex-direction: column;
                 align-items: flex-start;
-            }
-            .user-info {
+            }}
+            .user-info {{
                 text-align: left;
-            }
-            .details-layout {
+            }}
+            .details-layout {{
                 grid-template-columns: 1fr;
-            }
-        }
+            }}
+        }}
     </style>
 </head>
 <body>
@@ -902,7 +901,6 @@ def dashboard():
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
 
-    # Total de pessoas ativas (status != 'inativo')
     cur.execute("""
         SELECT COUNT(*) AS total
         FROM pessoas
@@ -911,7 +909,6 @@ def dashboard():
     row_total = cur.fetchone() or {"total": 0}
     total_pessoas = row_total["total"]
 
-    # Pessoas por status (apenas ativos)
     cur.execute("""
         SELECT COALESCE(status, 'Não informado') AS status, COUNT(*) AS total
         FROM pessoas
@@ -921,7 +918,6 @@ def dashboard():
     """)
     rows_status = cur.fetchall() or []
 
-    # Pessoas por cidade (top 5) – apenas ativos
     cur.execute("""
         SELECT COALESCE(cidade_origem, 'Não informada') AS cidade, COUNT(*) AS total
         FROM pessoas
@@ -1035,7 +1031,6 @@ def lista_pessoas():
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
 
-    # Só mostra quem não está inativo
     cur.execute("""
         SELECT *
         FROM pessoas
@@ -1147,6 +1142,7 @@ def detalhes_pessoa(pessoa_id: int):
         """
 
     inativar_link = url_for("inativar_pessoa", pessoa_id=pessoa_id)
+    editar_link = url_for("editar_pessoa", pessoa_id=pessoa_id)
     voltar_link = url_for("lista_pessoas")
     resumo_ia_link = url_for("resumo_pessoa_ia", pessoa_id=pessoa_id)
     classificar_ia_link = url_for("classificar_pessoa_ia_route", pessoa_id=pessoa_id)
@@ -1161,6 +1157,7 @@ def detalhes_pessoa(pessoa_id: int):
         <form method="post" action="{classificar_ia_link}">
             <button type="submit" class="btn btn-secondary">Classificar e sugerir próximos passos (IA)</button>
         </form>
+        <a href="{editar_link}" class="btn btn-secondary">Editar cadastro</a>
     </div>
 
     {resumo_ia_html}
@@ -1251,7 +1248,7 @@ def detalhes_pessoa(pessoa_id: int):
             </div>
 
             <div class="details-block">
-                <h3>Histórico e saúde</h3>
+                <h3>Histórico, saúde e avaliações</h3>
                 <div class="details-item-label">Situação de rua desde</div>
                 <div class="details-item-value">{_fmt(pessoa.get("situacao_rua_desde"))}</div>
                 <br>
@@ -1263,9 +1260,15 @@ def detalhes_pessoa(pessoa_id: int):
                 <br>
                 <div class="details-item-label">Observações gerais</div>
                 <div class="details-item-value">{_fmt(pessoa.get("observacoes"))}</div>
+                <br>
+                <div class="details-item-label">Avaliação médica</div>
+                <div class="details-item-value">{_fmt(pessoa.get("avaliacao_medica"))}</div>
+                <br>
+                <div class="details-item-label">Avaliação do psicólogo</div>
+                <div class="details-item-value">{_fmt(pessoa.get("avaliacao_psicologica"))}</div>
             </div>
 
-            <div style="margin-top: 10px; display:flex; gap: 8px;">
+            <div style="margin-top: 10px; display:flex; gap: 8px; flex-wrap:wrap;">
                 <a href="{voltar_link}" class="btn btn-secondary">Voltar para lista</a>
                 <form method="post" action="{inativar_link}" onsubmit="return confirm('Tem certeza que deseja marcar este cadastro como inativo?');">
                     <button type="submit" class="btn btn-danger">Marcar como inativo</button>
@@ -1351,7 +1354,6 @@ def classificar_pessoa_ia_route(pessoa_id: int):
         flash("Não foi possível classificar com IA.", "error")
         return redirect(url_for("detalhes_pessoa", pessoa_id=pessoa_id))
 
-    # Atualiza na tabela
     cur2 = conn.cursor()
     try:
         cur2.execute(
@@ -1401,6 +1403,9 @@ def nova_pessoa():
         dependencias_quimicas = request.form.get("dependencias_quimicas", "").strip() or None
         observacoes = request.form.get("observacoes", "").strip() or None
 
+        avaliacao_medica = request.form.get("avaliacao_medica", "").strip() or None
+        avaliacao_psicologica = request.form.get("avaliacao_psicologica", "").strip() or None
+
         foto_arquivo = None
         file = request.files.get("foto")
         if file and file.filename and allowed_file(file.filename):
@@ -1437,11 +1442,13 @@ def nova_pessoa():
                 saude_resumo,
                 dependencias_quimicas,
                 observacoes,
+                avaliacao_medica,
+                avaliacao_psicologica,
                 status,
                 data_cadastro,
                 foto_arquivo
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             tem_docs_int = 1 if tem_documentos else 0
             valores = (
@@ -1464,6 +1471,8 @@ def nova_pessoa():
                 saude_resumo,
                 dependencias_quimicas,
                 observacoes,
+                avaliacao_medica,
+                avaliacao_psicologica,
                 "ativo",
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 foto_arquivo,
@@ -1574,6 +1583,17 @@ def nova_pessoa():
 
         <div class="field-group">
             <div class="field">
+                <label>Avaliação médica (opcional)</label>
+                <textarea name="avaliacao_medica"></textarea>
+            </div>
+            <div class="field">
+                <label>Avaliação do psicólogo (opcional)</label>
+                <textarea name="avaliacao_psicologica"></textarea>
+            </div>
+        </div>
+
+        <div class="field-group">
+            <div class="field">
                 <label>Foto da pessoa (opcional)</label>
                 <input type="file" name="foto" accept="image/*">
             </div>
@@ -1586,6 +1606,254 @@ def nova_pessoa():
     </form>
     """
     return render_page("Novo cadastro", conteudo)
+
+
+# ---------- Editar pessoa ----------
+@app.route("/pessoas/<int:pessoa_id>/editar", methods=["GET", "POST"])
+@login_required
+def editar_pessoa(pessoa_id: int):
+    conn = get_connection()
+    cur = conn.cursor(dictionary=True)
+    cur.execute("SELECT * FROM pessoas WHERE id = %s", (pessoa_id,))
+    pessoa = cur.fetchone()
+
+    if not pessoa:
+        cur.close()
+        conn.close()
+        flash("Pessoa não encontrada para edição.", "error")
+        return redirect(url_for("lista_pessoas"))
+
+    if request.method == "POST":
+        nome = request.form.get("nome", "").strip()
+        apelido = request.form.get("apelido", "").strip() or None
+        data_nascimento = request.form.get("data_nascimento") or None
+
+        genero = request.form.get("genero", "").strip() or None
+        estado_civil = request.form.get("estado_civil", "").strip() or None
+        escolaridade = request.form.get("escolaridade", "").strip() or None
+        qtd_filhos_str = request.form.get("qtd_filhos", "").strip()
+        qtd_filhos = int(qtd_filhos_str) if qtd_filhos_str else None
+
+        documento_principal = request.form.get("documento_principal", "").strip() or None
+        tem_documentos = request.form.get("tem_documentos") == "on"
+        telefone = request.form.get("telefone", "").strip() or None
+        contato_emergencia = request.form.get("contato_emergencia", "").strip() or None
+        cidade_origem = request.form.get("cidade_origem", "").strip() or None
+
+        profissao_anterior = request.form.get("profissao_anterior", "").strip() or None
+        renda_mensal_aprox = request.form.get("renda_mensal_aprox", "").strip() or None
+        rede_apoio = request.form.get("rede_apoio", "").strip() or None
+
+        situacao_rua_desde = request.form.get("situacao_rua_desde", "").strip() or None
+        saude_resumo = request.form.get("saude_resumo", "").strip() or None
+        dependencias_quimicas = request.form.get("dependencias_quimicas", "").strip() or None
+        observacoes = request.form.get("observacoes", "").strip() or None
+
+        avaliacao_medica = request.form.get("avaliacao_medica", "").strip() or None
+        avaliacao_psicologica = request.form.get("avaliacao_psicologica", "").strip() or None
+
+        foto_arquivo = pessoa.get("foto_arquivo")
+        file = request.files.get("foto")
+        if file and file.filename and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            prefix = datetime.now().strftime("%Y%m%d%H%M%S")
+            filename = f"{prefix}_{filename}"
+            file.save(FOTOS_DIR / filename)
+            foto_arquivo = filename
+
+        if not nome:
+            flash("Nome é obrigatório.", "warning")
+        else:
+            tem_docs_int = 1 if tem_documentos else 0
+            update_sql = """
+            UPDATE pessoas SET
+                nome = %s,
+                apelido = %s,
+                data_nascimento = %s,
+                genero = %s,
+                estado_civil = %s,
+                escolaridade = %s,
+                qtd_filhos = %s,
+                documento_principal = %s,
+                tem_documentos = %s,
+                telefone = %s,
+                contato_emergencia = %s,
+                cidade_origem = %s,
+                profissao_anterior = %s,
+                renda_mensal_aprox = %s,
+                rede_apoio = %s,
+                situacao_rua_desde = %s,
+                saude_resumo = %s,
+                dependencias_quimicas = %s,
+                observacoes = %s,
+                avaliacao_medica = %s,
+                avaliacao_psicologica = %s,
+                foto_arquivo = %s
+            WHERE id = %s
+            """
+            valores = (
+                nome,
+                apelido,
+                data_nascimento or None,
+                genero,
+                estado_civil,
+                escolaridade,
+                qtd_filhos,
+                documento_principal,
+                tem_docs_int,
+                telefone,
+                contato_emergencia,
+                cidade_origem,
+                profissao_anterior,
+                renda_mensal_aprox,
+                rede_apoio,
+                situacao_rua_desde,
+                saude_resumo,
+                dependencias_quimicas,
+                observacoes,
+                avaliacao_medica,
+                avaliacao_psicologica,
+                foto_arquivo,
+                pessoa_id,
+            )
+
+            cur_update = conn.cursor()
+            cur_update.execute(update_sql, valores)
+            conn.commit()
+            cur_update.close()
+            cur.close()
+            conn.close()
+
+            flash("Cadastro atualizado com sucesso.", "success")
+            return redirect(url_for("detalhes_pessoa", pessoa_id=pessoa_id))
+
+    def _f(v):
+        return v or ""
+
+    tem_docs_checked = "checked" if pessoa.get("tem_documentos") else ""
+
+    link_voltar = url_for("detalhes_pessoa", pessoa_id=pessoa_id)
+
+    conteudo = f"""
+    <h2>Editar cadastro da pessoa acolhida</h2>
+    <form method="post" enctype="multipart/form-data">
+        <div class="field-group">
+            <div class="field">
+                <label>Nome completo *</label>
+                <input type="text" name="nome" value="{_f(pessoa.get('nome'))}" required>
+            </div>
+            <div class="field">
+                <label>Apelido</label>
+                <input type="text" name="apelido" value="{_f(pessoa.get('apelido'))}">
+            </div>
+            <div class="field">
+                <label>Data de nascimento</label>
+                <input type="date" name="data_nascimento" value="{_f(pessoa.get('data_nascimento'))}">
+            </div>
+            <div class="field">
+                <label>Gênero</label>
+                <input type="text" name="genero" value="{_f(pessoa.get('genero'))}">
+            </div>
+            <div class="field">
+                <label>Estado civil</label>
+                <input type="text" name="estado_civil" value="{_f(pessoa.get('estado_civil'))}">
+            </div>
+            <div class="field">
+                <label>Escolaridade</label>
+                <input type="text" name="escolaridade" value="{_f(pessoa.get('escolaridade'))}">
+            </div>
+            <div class="field">
+                <label>Quantidade de filhos</label>
+                <input type="number" name="qtd_filhos" min="0" value="{_f(pessoa.get('qtd_filhos'))}">
+            </div>
+            <div class="field">
+                <label>Documento principal (RG/CPF ou outro)</label>
+                <input type="text" name="documento_principal" value="{_f(pessoa.get('documento_principal'))}">
+            </div>
+        </div>
+
+        <div class="field-group">
+            <div class="field">
+                <label><input type="checkbox" name="tem_documentos" {tem_docs_checked}> Possui documentos básicos</label>
+            </div>
+            <div class="field">
+                <label>Telefone</label>
+                <input type="text" name="telefone" value="{_f(pessoa.get('telefone'))}">
+            </div>
+            <div class="field">
+                <label>Contato de emergência</label>
+                <input type="text" name="contato_emergencia" value="{_f(pessoa.get('contato_emergencia'))}">
+            </div>
+            <div class="field">
+                <label>Cidade de origem</label>
+                <input type="text" name="cidade_origem" value="{_f(pessoa.get('cidade_origem'))}">
+            </div>
+        </div>
+
+        <div class="field-group">
+            <div class="field">
+                <label>Profissão anterior</label>
+                <input type="text" name="profissao_anterior" value="{_f(pessoa.get('profissao_anterior'))}">
+            </div>
+            <div class="field">
+                <label>Renda mensal aproximada</label>
+                <input type="text" name="renda_mensal_aprox" value="{_f(pessoa.get('renda_mensal_aprox'))}">
+            </div>
+            <div class="field">
+                <label>Rede de apoio (família, amigos, instituições)</label>
+                <textarea name="rede_apoio">{_f(pessoa.get('rede_apoio'))}</textarea>
+            </div>
+        </div>
+
+        <div class="field-group">
+            <div class="field">
+                <label>Situação de rua desde quando?</label>
+                <textarea name="situacao_rua_desde">{_f(pessoa.get('situacao_rua_desde'))}</textarea>
+            </div>
+            <div class="field">
+                <label>Resumo de saúde (doenças, medicações, etc.)</label>
+                <textarea name="saude_resumo">{_f(pessoa.get('saude_resumo'))}</textarea>
+            </div>
+        </div>
+
+        <div class="field-group">
+            <div class="field">
+                <label>Dependências químicas</label>
+                <textarea name="dependencias_quimicas">{_f(pessoa.get('dependencias_quimicas'))}</textarea>
+            </div>
+            <div class="field">
+                <label>Observações gerais</label>
+                <textarea name="observacoes">{_f(pessoa.get('observacoes'))}</textarea>
+            </div>
+        </div>
+
+        <div class="field-group">
+            <div class="field">
+                <label>Avaliação médica</label>
+                <textarea name="avaliacao_medica">{_f(pessoa.get('avaliacao_medica'))}</textarea>
+            </div>
+            <div class="field">
+                <label>Avaliação do psicólogo</label>
+                <textarea name="avaliacao_psicologica">{_f(pessoa.get('avaliacao_psicologica'))}</textarea>
+            </div>
+        </div>
+
+        <div class="field-group">
+            <div class="field">
+                <label>Foto da pessoa (enviar nova para substituir, ou deixar em branco)</label>
+                <input type="file" name="foto" accept="image/*">
+            </div>
+        </div>
+
+        <div style="margin-top: 10px; display:flex; gap: 8px; flex-wrap:wrap;">
+            <button type="submit" class="btn btn-primary">Salvar alterações</button>
+            <a href="{link_voltar}" class="btn btn-secondary">Cancelar</a>
+        </div>
+    </form>
+    """
+    cur.close()
+    conn.close()
+    return render_page("Editar cadastro", conteudo)
 
 
 # ============================================================
