@@ -86,7 +86,7 @@ GEMINI_API_KEY = os.getenv(
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel("gemini-2.5-flash")
+    gemini_model = genai.GenerativeModel("gemini-1.5-flash")
 else:
     gemini_model = None
 
@@ -131,7 +131,7 @@ Texto para analisar:
 def classificar_pessoa_ia(pessoa: dict) -> dict:
     """
     Classifica prioridade e temas principais a partir dos dados da pessoa,
-    retornando um dicionário com:
+    retornando:
       - prioridade: 'alta' | 'media' | 'baixa'
       - tags: string separada por ponto e vírgula
       - proximos_passos: texto explicativo
@@ -177,6 +177,7 @@ Informações da pessoa:
     resp = gemini_model.generate_content(prompt)
     texto = (resp.text or "").strip()
 
+    # Remove cercas de código se vierem
     if texto.startswith("```"):
         texto = texto.strip("`")
         if "\n" in texto:
@@ -268,7 +269,7 @@ def login_required(f):
 
 
 # ============================================================
-# 🎨 Layout base (logo maior, fundo branco, sem {{}} no CSS/JS)
+# 🎨 Layout base
 # ============================================================
 
 layout_base = """
@@ -720,6 +721,20 @@ layout_base = """
             margin-bottom: 6px;
         }
 
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            background: #e5f4ff;
+            color: #1e40af;
+        }
+
+        .status-badge-inativo {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
         @media (max-width: 720px) {
             body {
                 padding: 10px;
@@ -796,7 +811,7 @@ def render_page(titulo: str, conteudo_html: str):
 
 
 # ============================================================
-# 🧭 Rotas
+# 🧭 Rotas básicas
 # ============================================================
 
 @app.route("/")
@@ -894,30 +909,38 @@ def registrar():
     return render_page("Cadastro de usuário", conteudo)
 
 
-# ---------- Dashboard ----------
+# ============================================================
+# 📊 Dashboard
+# ============================================================
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
 
+    # Totais ativos x inativos
     cur.execute("""
-        SELECT COUNT(*) AS total
+        SELECT
+          SUM(CASE WHEN status = 'inativo' THEN 1 ELSE 0 END) AS inativos,
+          SUM(CASE WHEN status = 'inativo' THEN 0 ELSE 1 END) AS ativos
         FROM pessoas
-        WHERE status <> 'inativo' OR status IS NULL
     """)
-    row_total = cur.fetchone() or {"total": 0}
-    total_pessoas = row_total["total"]
+    row_total = cur.fetchone() or {"ativos": 0, "inativos": 0}
+    total_ativos = row_total["ativos"] or 0
+    total_inativos = row_total["inativos"] or 0
+    total_pessoas = total_ativos + total_inativos
 
+    # Distribuição por status (inclui inativo)
     cur.execute("""
         SELECT COALESCE(status, 'Não informado') AS status, COUNT(*) AS total
         FROM pessoas
-        WHERE status <> 'inativo' OR status IS NULL
         GROUP BY COALESCE(status, 'Não informado')
         ORDER BY total DESC
     """)
     rows_status = cur.fetchall() or []
 
+    # Top 5 cidades (considerando apenas não inativos)
     cur.execute("""
         SELECT COALESCE(cidade_origem, 'Não informada') AS cidade, COUNT(*) AS total
         FROM pessoas
@@ -943,29 +966,29 @@ def dashboard():
 
     <div class="cards-row">
         <div class="card-metric">
-            <div class="card-metric-label">Total de pessoas acolhidas (ativas)</div>
+            <div class="card-metric-label">Total de cadastros</div>
             <div class="card-metric-value">{total_pessoas}</div>
-            <div class="card-metric-sub">Registros ativos na base</div>
+            <div class="card-metric-sub">Ativos + inativos</div>
         </div>
         <div class="card-metric">
-            <div class="card-metric-label">Situações cadastradas</div>
-            <div class="card-metric-value">{len(status_labels)}</div>
-            <div class="card-metric-sub">Estados diferentes de acompanhamento</div>
+            <div class="card-metric-label">Cadastros ativos</div>
+            <div class="card-metric-value">{total_ativos}</div>
+            <div class="card-metric-sub">Em acompanhamento</div>
         </div>
         <div class="card-metric">
-            <div class="card-metric-label">Cidades de origem</div>
-            <div class="card-metric-value">{len(cidade_labels)}</div>
-            <div class="card-metric-sub">Top 5 mais recorrentes</div>
+            <div class="card-metric-label">Cadastros inativados</div>
+            <div class="card-metric-value">{total_inativos}</div>
+            <div class="card-metric-sub">Encerrados / históricos</div>
         </div>
     </div>
 
     <div class="charts-row">
         <div class="chart-card">
-            <h3>Distribuição por status (ativos)</h3>
+            <h3>Distribuição por status (ativos e inativos)</h3>
             <canvas id="chartStatus"></canvas>
         </div>
         <div class="chart-card">
-            <h3>Pessoas por cidade (Top 5)</h3>
+            <h3>Pessoas por cidade (Top 5 – ativos)</h3>
             <canvas id="chartCidade"></canvas>
         </div>
     </div>
@@ -1024,18 +1047,24 @@ def dashboard():
     return render_page("Dashboard", conteudo)
 
 
-# ---------- Lista de pessoas ----------
+# ============================================================
+# 👥 Lista, detalhes, IA, cadastro, edição, inativar
+# ============================================================
+
+# ---------- Lista de pessoas (ativos + inativos) ----------
 @app.route("/pessoas")
 @login_required
 def lista_pessoas():
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
 
+    # Ativos primeiro, depois inativos, ordenando por ID desc
     cur.execute("""
         SELECT *
         FROM pessoas
-        WHERE status <> 'inativo' OR status IS NULL
-        ORDER BY id DESC
+        ORDER BY
+          CASE WHEN status = 'inativo' THEN 1 ELSE 0 END,
+          id DESC
     """)
     pessoas = cur.fetchall()
     cur.close()
@@ -1050,6 +1079,14 @@ def lista_pessoas():
         else:
             foto_html = '<div class="photo-thumb-placeholder">sem foto</div>'
 
+        raw_status = (p.get("status") or "").strip().lower()
+        if raw_status == "inativo":
+            status_label = "Inativo"
+            status_html = f'<span class="status-badge status-badge-inativo">{status_label}</span>'
+        else:
+            status_label = p.get("status") or "Ativo"
+            status_html = f'<span class="status-badge">{status_label}</span>'
+
         detalhes_link = url_for("detalhes_pessoa", pessoa_id=p["id"])
 
         linhas.append(f"""
@@ -1060,7 +1097,7 @@ def lista_pessoas():
                 <td>{p.get('apelido') or ''}</td>
                 <td>{p.get('telefone') or ''}</td>
                 <td>{p.get('cidade_origem') or ''}</td>
-                <td>{p.get('status') or ''}</td>
+                <td>{status_html}</td>
                 <td><a class="btn btn-secondary" href="{detalhes_link}">Ver detalhes</a></td>
             </tr>
         """)
@@ -1731,7 +1768,6 @@ def editar_pessoa(pessoa_id: int):
         return v or ""
 
     tem_docs_checked = "checked" if pessoa.get("tem_documentos") else ""
-
     link_voltar = url_for("detalhes_pessoa", pessoa_id=pessoa_id)
 
     conteudo = f"""
