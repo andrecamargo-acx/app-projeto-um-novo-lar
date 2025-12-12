@@ -10,14 +10,15 @@ def create_app():
     app = Flask(__name__, static_folder="static")
     app.secret_key = Config.SECRET_KEY
 
-    # Blueprints
-    app.register_blueprint(auth_bp)            # /, /login, /logout, /registrar
-    app.register_blueprint(dashboard_bp)       # /dashboard
-    app.register_blueprint(pessoas_bp)         # /pessoas
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(dashboard_bp)
+    app.register_blueprint(pessoas_bp)
 
     return app
 
+# ✅ ISSO AQUI RESOLVE NO RENDER (gunicorn app:app)
+app = create_app()
+
 if __name__ == "__main__":
-    app = create_app()
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, host="0.0.0.0", port=port)
