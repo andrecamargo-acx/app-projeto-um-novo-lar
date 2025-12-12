@@ -18,7 +18,7 @@ def create_app():
     # %% [markdown]
     # ## create_app()
     # App factory: concentra a montagem da aplicação.
-    app = Flask(__name__, static_folder="static")
+    app = Flask(__name__, static_folder="static", static_url_path="/static")
     app.secret_key = Config.SECRET_KEY
 
     # Blueprints
@@ -31,7 +31,6 @@ def create_app():
 
 # ✅ Necessário para o Render/Gunicorn: "gunicorn app:app"
 app = create_app()
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
