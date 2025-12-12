@@ -119,7 +119,31 @@ layout_base = """<!doctype html>
     .photo-large{width:160px; height:160px; border-radius:24px; object-fit:cover; border:3px solid #e5e7eb; box-shadow:0 15px 30px rgba(15,35,95,.25);}
     .photo-large-placeholder{width:160px; height:160px; border-radius:24px; border:2px dashed #cbd5e1; display:inline-flex; align-items:center; justify-content:center; font-size:11px; color:#9ca3af;}
     @media (max-width:720px){body{padding:10px}.topbar{flex-direction:column; align-items:flex-start}.user-info{text-align:left}.details-layout{grid-template-columns:1fr}.brand-logo{width:90px;height:90px}}
-  </style>
+  
+/* Rodapé com marca ACX (detalhe) */
+.footer-acx{
+  margin-top: 28px;
+  padding: 14px 0 6px 0;
+  border-top: 1px solid rgba(17,24,39,0.08);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  color:#6b7280;
+  font-size:12px;
+}
+.footer-acx img{
+  height: 60px;          /* tamanho ideal */
+  width: auto;
+  opacity: 0.85;
+  filter: grayscale(20%);
+}
+
+.footer-acx img:hover{
+  opacity: 0.9;
+  filter: grayscale(20%);
+}
+        </style>
 </head>
 <body>
 <div class="app-shell">
@@ -165,6 +189,12 @@ layout_base = """<!doctype html>
     {{ conteudo|safe }}
   </div>
 </div>
+
+    <footer class="footer-acx">
+      <span>Desenvolvido por</span>
+      <img src="/static/logo_acx.png" alt="ACX Developing Beyond" loading="lazy">
+    </footer>
+
 </body>
 </html>
 """

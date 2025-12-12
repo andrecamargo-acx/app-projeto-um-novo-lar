@@ -12,9 +12,6 @@
 from datetime import datetime
 from pathlib import Path
 
-import io
-import csv
-
 from flask import Blueprint, request, redirect, url_for, flash, session, send_file, make_response
 from werkzeug.utils import secure_filename
 
@@ -88,10 +85,7 @@ def lista_pessoas():
 
     conteudo = f"""
     <h2>Pessoas acolhidas</h2>
-    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-      <a class="btn btn-primary" href="{url_for('pessoas.nova_pessoa')}">Novo cadastro</a>
-      <a class="btn btn-secondary" href="{url_for('pessoas.exportar_csv')}">Exportar CSV (todas)</a>
-    </div>
+    <p><a class="btn btn-primary" href="{url_for('pessoas.nova_pessoa')}">Novo cadastro</a></p>
     <table>
       <thead>
         <tr>
@@ -193,42 +187,17 @@ def detalhes_pessoa(pessoa_id: int):
         </div>""")
     auditoria_html = "".join(aud_linhas) if aud_linhas else "<div style='color:#6b7280;'>Sem registros de auditoria.</div>"
 
-    status_lower = (pessoa.get('status') or '').strip().lower()
-
-    inativar_form_html = ""
-    ativar_form_html = ""
-    if status_lower != "inativo":
-        inativar_form_html = f"""<form method="post" action="{url_for('pessoas.inativar_pessoa', pessoa_id=pessoa_id)}"
-              onsubmit="return confirm('Tem certeza que deseja marcar este cadastro como inativo?');" style="margin:0;">
-            <button type="submit" class="btn btn-danger">Marcar como inativo</button>
-          </form>"""
-    else:
-        ativar_form_html = f"""<form method="post" action="{url_for('pessoas.ativar_pessoa', pessoa_id=pessoa_id)}"
-              onsubmit="return confirm('Tem certeza que deseja reativar este cadastro?');" style="margin:0;">
-            <button type="submit" class="btn btn-primary">Reativar cadastro</button>
-          </form>"""
-
     conteudo = f"""
-    <style>
-      .details-layout{{display:grid; grid-template-columns: 1fr 340px; gap:16px; align-items:start;}}
-      .details-side .details-block{{position:sticky; top:12px;}}
-      .details-actions{{margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;}}
-      .tabbar{{display:flex; gap:8px; flex-wrap:wrap; margin: 10px 0 14px 0;}}
-      .tabbar .tab-btn{{border-radius:999px;}}
-      .tabbar .tab-btn.active{{background:#1c75ff; color:#fff; border-color:#1c75ff;}}
-      @media (max-width: 980px){{
-        .details-layout{{grid-template-columns: 1fr;}}
-        .details-side .details-block{{position:static;}}
-      }}
-    </style>
-
     <h2>Detalhes da pessoa acolhida</h2>
 
     <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
-      <form method="post" action="{url_for('pessoas.resumo_pessoa_ia', pessoa_id=pessoa_id)}" style="margin:0;">
+      <a href="{url_for('pessoas.exportar_pdf', pessoa_id=pessoa_id)}" class="btn btn-secondary">Exportar PDF</a>
+      <a href="{url_for('pessoas.exportar_csv')}" class="btn btn-secondary">Exportar CSV (todas)</a>
+
+      <form method="post" action="{url_for('pessoas.resumo_pessoa_ia', pessoa_id=pessoa_id)}">
         <button type="submit" class="btn btn-primary">Gerar resumo com IA</button>
       </form>
-      <form method="post" action="{url_for('pessoas.classificar_pessoa_ia_route', pessoa_id=pessoa_id)}" style="margin:0;">
+      <form method="post" action="{url_for('pessoas.classificar_pessoa_ia_route', pessoa_id=pessoa_id)}">
         <button type="submit" class="btn btn-secondary">Classificar e sugerir próximos passos (IA)</button>
       </form>
       <a href="{url_for('pessoas.editar_pessoa', pessoa_id=pessoa_id)}" class="btn btn-secondary">Editar cadastro</a>
@@ -238,113 +207,116 @@ def detalhes_pessoa(pessoa_id: int):
     {sugestao_ia_html}
     {perguntas_ia_html}
 
-    <div class="tabbar">
-      <button type="button" class="btn btn-secondary tab-btn" data-tab="tab_cadastro" onclick="showTab('tab_cadastro')">Cadastro</button>
-      <button type="button" class="btn btn-secondary tab-btn" data-tab="tab_saude" onclick="showTab('tab_saude')">Saúde & Avaliações</button>
-      <button type="button" class="btn btn-secondary tab-btn" data-tab="tab_acomp" onclick="showTab('tab_acomp')">Acompanhamento</button>
-      <button type="button" class="btn btn-secondary tab-btn" data-tab="tab_auditoria" onclick="showTab('tab_auditoria')">Histórico técnico</button>
+    
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin: 10px 0 14px 0;">
+      <button type="button" class="btn btn-secondary" onclick="showTab('tab_cadastro')">Cadastro</button>
+      <button type="button" class="btn btn-secondary" onclick="showTab('tab_saude')">Saúde & Avaliações</button>
+      <button type="button" class="btn btn-secondary" onclick="showTab('tab_acomp')">Acompanhamento</button>
+      <button type="button" class="btn btn-secondary" onclick="showTab('tab_auditoria')">Histórico técnico</button>
     </div>
 
     <script>
-      function showTab(id){{
+      function showTab(id){
         const tabs = ['tab_cadastro','tab_saude','tab_acomp','tab_auditoria'];
-        tabs.forEach(t => {{
+        tabs.forEach(t => {
           const el = document.getElementById(t);
           if(el) el.style.display = (t===id ? 'block' : 'none');
-        }});
-        document.querySelectorAll('.tab-btn').forEach(b => {{
-          b.classList.toggle('active', b.dataset.tab === id);
-        }});
-        const top = document.querySelector('h2');
-        if(top) top.scrollIntoView({{behavior:'smooth', block:'start'}});
-      }}
+        });
+        window.scrollTo({top: 0, behavior: 'smooth'});
+      }
+      // padrão: cadastro
       document.addEventListener('DOMContentLoaded', () => showTab('tab_cadastro'));
     </script>
 
     <div class="details-layout">
-      <div class="details-main">
+      <div>
         <div id="tab_cadastro">
-          <div class="details-block">
-            <h3>Informações gerais</h3>
-            <div class="details-grid">
-              <div><div class="details-item-label">Nome completo</div><div class="details-item-value">{_fmt(pessoa.get('nome'))}</div></div>
-              <div><div class="details-item-label">Apelido</div><div class="details-item-value">{_fmt(pessoa.get('apelido'))}</div></div>
-              <div><div class="details-item-label">Gênero</div><div class="details-item-value">{_fmt(pessoa.get('genero'))}</div></div>
-              <div><div class="details-item-label">Estado civil</div><div class="details-item-value">{_fmt(pessoa.get('estado_civil'))}</div></div>
-              <div><div class="details-item-label">Escolaridade</div><div class="details-item-value">{_fmt(pessoa.get('escolaridade'))}</div></div>
-              <div><div class="details-item-label">Quantidade de filhos</div><div class="details-item-value">{_fmt(pessoa.get('qtd_filhos'))}</div></div>
-              <div><div class="details-item-label">Nascimento</div><div class="details-item-value">{_fmt(pessoa.get('data_nascimento'))}</div></div>
-              <div><div class="details-item-label">Documento principal</div><div class="details-item-value">{_fmt(pessoa.get('documento_principal'))}</div></div>
-              <div><div class="details-item-label">Possui documentos básicos</div><div class="details-item-value">{"Sim" if pessoa.get("tem_documentos") else "Não"}</div></div>
-              <div><div class="details-item-label">Telefone</div><div class="details-item-value">{_fmt(pessoa.get('telefone'))}</div></div>
-              <div><div class="details-item-label">Contato de emergência</div><div class="details-item-value">{_fmt(pessoa.get('contato_emergencia'))}</div></div>
-              <div><div class="details-item-label">Cidade de origem</div><div class="details-item-value">{_fmt(pessoa.get('cidade_origem'))}</div></div>
-              <div><div class="details-item-label">Status</div><div class="details-item-value">{_fmt(pessoa.get('status'))}</div></div>
-              <div><div class="details-item-label">Data de cadastro</div><div class="details-item-value">{_fmt(pessoa.get('data_cadastro'))}</div></div>
-              <div><div class="details-item-label">Prioridade (IA)</div><div class="details-item-value">{_fmt(pessoa.get('prioridade_ia'))}</div></div>
-              <div><div class="details-item-label">Tags (IA)</div><div class="details-item-value">{_fmt(pessoa.get('tags_ia'))}</div></div>
-            </div>
-          </div>
-
-          <div class="details-block">
-            <h3>Contexto familiar e trabalho</h3>
-            <div class="details-item-label">Profissão anterior</div>
-            <div class="details-item-value">{_fmt(pessoa.get('profissao_anterior'))}</div><br>
-            <div class="details-item-label">Renda mensal aproximada</div>
-            <div class="details-item-value">{_fmt(pessoa.get('renda_mensal_aprox'))}</div><br>
-            <div class="details-item-label">Rede de apoio</div>
-            <div class="details-item-value">{_fmt(pessoa.get('rede_apoio'))}</div>
+        <div class="details-block">
+          <h3>Informações gerais</h3>
+          <div class="details-grid">
+            <div><div class="details-item-label">Nome completo</div><div class="details-item-value">{_fmt(pessoa.get('nome'))}</div></div>
+            <div><div class="details-item-label">Apelido</div><div class="details-item-value">{_fmt(pessoa.get('apelido'))}</div></div>
+            <div><div class="details-item-label">Gênero</div><div class="details-item-value">{_fmt(pessoa.get('genero'))}</div></div>
+            <div><div class="details-item-label">Estado civil</div><div class="details-item-value">{_fmt(pessoa.get('estado_civil'))}</div></div>
+            <div><div class="details-item-label">Escolaridade</div><div class="details-item-value">{_fmt(pessoa.get('escolaridade'))}</div></div>
+            <div><div class="details-item-label">Quantidade de filhos</div><div class="details-item-value">{_fmt(pessoa.get('qtd_filhos'))}</div></div>
+            <div><div class="details-item-label">Nascimento</div><div class="details-item-value">{_fmt(pessoa.get('data_nascimento'))}</div></div>
+            <div><div class="details-item-label">Documento principal</div><div class="details-item-value">{_fmt(pessoa.get('documento_principal'))}</div></div>
+            <div><div class="details-item-label">Possui documentos básicos</div><div class="details-item-value">{"Sim" if pessoa.get("tem_documentos") else "Não"}</div></div>
+            <div><div class="details-item-label">Telefone</div><div class="details-item-value">{_fmt(pessoa.get('telefone'))}</div></div>
+            <div><div class="details-item-label">Contato de emergência</div><div class="details-item-value">{_fmt(pessoa.get('contato_emergencia'))}</div></div>
+            <div><div class="details-item-label">Cidade de origem</div><div class="details-item-value">{_fmt(pessoa.get('cidade_origem'))}</div></div>
+            <div><div class="details-item-label">Status</div><div class="details-item-value">{_fmt(pessoa.get('status'))}</div></div>
+            <div><div class="details-item-label">Data de cadastro</div><div class="details-item-value">{_fmt(pessoa.get('data_cadastro'))}</div></div>
+            <div><div class="details-item-label">Prioridade (IA)</div><div class="details-item-value">{_fmt(pessoa.get('prioridade_ia'))}</div></div>
+            <div><div class="details-item-label">Tags (IA)</div><div class="details-item-value">{_fmt(pessoa.get('tags_ia'))}</div></div>
           </div>
         </div>
 
-        <div id="tab_saude" style="display:none;">
-          <div class="details-block">
-            <h3>Histórico, saúde e avaliações</h3>
-            <div class="details-item-label">Situação de rua desde</div>
-            <div class="details-item-value">{_fmt(pessoa.get('situacao_rua_desde'))}</div><br>
-            <div class="details-item-label">Resumo de saúde</div>
-            <div class="details-item-value">{_fmt(pessoa.get('saude_resumo'))}</div><br>
-            <div class="details-item-label">Dependências químicas</div>
-            <div class="details-item-value">{_fmt(pessoa.get('dependencias_quimicas'))}</div><br>
-            <div class="details-item-label">Observações gerais</div>
-            <div class="details-item-value">{_fmt(pessoa.get('observacoes'))}</div><br>
-            <div class="details-item-label">Avaliação médica</div>
-            <div class="details-item-value">{_fmt(pessoa.get('avaliacao_medica'))}</div><br>
-            <div class="details-item-label">Avaliação do psicólogo</div>
-            <div class="details-item-value">{_fmt(pessoa.get('avaliacao_psicologica'))}</div>
-          </div>
-        </div>
-
-        <div id="tab_acomp" style="display:none;">
-          <div class="details-block">
-            <h3>Novo evento de acompanhamento</h3>
-            <form method="post" action="{url_for('pessoas.adicionar_evento', pessoa_id=pessoa_id)}">
-              <div class="field-group">
-                <div class="field"><label>Tipo</label><input type="text" name="tipo_evento" placeholder="Ex: avaliação_medica, avaliacao_psicologica, encaminhamento"></div>
-                <div class="field"><label>Data do evento</label><input type="date" name="data_evento"></div>
-              </div>
-              <div class="field"><label>Descrição</label><textarea name="descricao" required></textarea></div>
-              <button type="submit" class="btn btn-primary">Adicionar evento</button>
-            </form>
-          </div>
-          <h3 style="margin-top:14px;">Linha do tempo</h3>
-          {eventos_html}
-        </div>
-
-        <div id="tab_auditoria" style="display:none;">
-          <h3>Auditoria</h3>
-          {auditoria_html}
-        </div>
-
-        <div class="details-actions">
-          <a href="{url_for('pessoas.lista_pessoas')}" class="btn btn-secondary">Voltar para lista</a>
-          <a href="{url_for('pessoas.exportar_pdf', pessoa_id=pessoa_id)}" class="btn btn-secondary">Exportar PDF</a>
-          {inativar_form_html}
-          {ativar_form_html}
+        <div class="details-block">
+          <h3>Contexto familiar e trabalho</h3>
+          <div class="details-item-label">Profissão anterior</div>
+          <div class="details-item-value">{_fmt(pessoa.get('profissao_anterior'))}</div><br>
+          <div class="details-item-label">Renda mensal aproximada</div>
+          <div class="details-item-value">{_fmt(pessoa.get('renda_mensal_aprox'))}</div><br>
+          <div class="details-item-label">Rede de apoio</div>
+          <div class="details-item-value">{_fmt(pessoa.get('rede_apoio'))}</div>
         </div>
       </div>
 
-      <div class="details-side">
+      <div id="tab_saude" style="display:none;">
+        <div class="details-block">
+          <h3>Histórico, saúde e avaliações</h3>
+          <div class="details-item-label">Situação de rua desde</div>
+          <div class="details-item-value">{_fmt(pessoa.get('situacao_rua_desde'))}</div><br>
+          <div class="details-item-label">Resumo de saúde</div>
+          <div class="details-item-value">{_fmt(pessoa.get('saude_resumo'))}</div><br>
+          <div class="details-item-label">Dependências químicas</div>
+          <div class="details-item-value">{_fmt(pessoa.get('dependencias_quimicas'))}</div><br>
+          <div class="details-item-label">Observações gerais</div>
+          <div class="details-item-value">{_fmt(pessoa.get('observacoes'))}</div><br>
+          <div class="details-item-label">Avaliação médica</div>
+          <div class="details-item-value">{_fmt(pessoa.get('avaliacao_medica'))}</div><br>
+          <div class="details-item-label">Avaliação do psicólogo</div>
+          <div class="details-item-value">{_fmt(pessoa.get('avaliacao_psicologica'))}</div>
+        </div>
+
+        </div>
+      </div>
+
+      <div id="tab_acomp" style="display:none;">
+        <div class="details-block">
+          <h3>Novo evento de acompanhamento</h3>
+          <form method="post" action="{url_for('pessoas.adicionar_evento', pessoa_id=pessoa_id)}">
+            <div class="field-group">
+              <div class="field"><label>Tipo</label><input type="text" name="tipo_evento" placeholder="Ex: avaliação_medica, avaliacao_psicologica, encaminhamento"></div>
+              <div class="field"><label>Data do evento</label><input type="date" name="data_evento"></div>
+            </div>
+            <div class="field"><label>Descrição</label><textarea name="descricao" required></textarea></div>
+            <button type="submit" class="btn btn-primary">Adicionar evento</button>
+          </form>
+        </div>
+        <h3 style="margin-top:14px;">Linha do tempo</h3>
+        {eventos_html}
+      </div>
+
+      <div id="tab_auditoria" style="display:none;">
+        <h3>Auditoria</h3>
+        {auditoria_html}
+      </div>
+
+      <div style="margin-top: 10px; display:flex; gap: 8px; flex-wrap:wrap;">
+          <a href="{url_for('pessoas.lista_pessoas')}" class="btn btn-secondary">Voltar para lista</a>
+          {('' if (pessoa.get('status') or '').strip().lower()=='inativo' else f'''<form method="post" action="{url_for('pessoas.inativar_pessoa', pessoa_id=pessoa_id)}" onsubmit="return confirm('Tem certeza que deseja marcar este cadastro como inativo?');">
+            <button type="submit" class="btn btn-danger">Marcar como inativo</button>
+          </form>''')}
+          {('' if (pessoa.get('status') or '').strip().lower()!='inativo' else f'''<form method="post" action="{url_for('pessoas.ativar_pessoa', pessoa_id=pessoa_id)}" onsubmit="return confirm('Tem certeza que deseja reativar este cadastro?');">
+            <button type="submit" class="btn btn-primary">Reativar cadastro</button>
+          </form>''')}
+        </div>
+      </div>
+
+      <div>
         <div class="details-block" style="text-align:center;">
           {foto_html}
           <div style="font-size:11px; color:#6b7280; margin-top:6px;">Foto registrada no cadastro</div>
@@ -610,6 +582,29 @@ def nova_pessoa():
         <div class="field"><label>Foto da pessoa (opcional)</label><input type="file" name="foto" accept="image/*"></div>
       </div>
 
+      </div>
+      </div>
+
+      <div id="tab_acomp" style="display:none;">
+        <div class="details-block">
+          <h3>Novo evento de acompanhamento</h3>
+          <form method="post" action="{url_for('pessoas.adicionar_evento', pessoa_id=pessoa_id)}">
+            <div class="field-group">
+              <div class="field"><label>Tipo</label><input type="text" name="tipo_evento" placeholder="Ex: avaliação_medica, avaliacao_psicologica, encaminhamento"></div>
+              <div class="field"><label>Data do evento</label><input type="date" name="data_evento"></div>
+            </div>
+            <div class="field"><label>Descrição</label><textarea name="descricao" required></textarea></div>
+            <button type="submit" class="btn btn-primary">Adicionar evento</button>
+          </form>
+        </div>
+        <h3 style="margin-top:14px;">Linha do tempo</h3>
+        {eventos_html}
+      </div>
+
+      <div id="tab_auditoria" style="display:none;">
+        <h3>Auditoria</h3>
+        {auditoria_html}
+      </div>
 
       <div style="margin-top: 10px; display:flex; gap: 8px; flex-wrap:wrap;">
         <button type="submit" class="btn btn-primary">Salvar cadastro</button>
@@ -753,6 +748,29 @@ def editar_pessoa(pessoa_id: int):
         <div class="field"><label>Foto (envie uma nova para substituir)</label><input type="file" name="foto" accept="image/*"></div>
       </div>
 
+      </div>
+      </div>
+
+      <div id="tab_acomp" style="display:none;">
+        <div class="details-block">
+          <h3>Novo evento de acompanhamento</h3>
+          <form method="post" action="{url_for('pessoas.adicionar_evento', pessoa_id=pessoa_id)}">
+            <div class="field-group">
+              <div class="field"><label>Tipo</label><input type="text" name="tipo_evento" placeholder="Ex: avaliação_medica, avaliacao_psicologica, encaminhamento"></div>
+              <div class="field"><label>Data do evento</label><input type="date" name="data_evento"></div>
+            </div>
+            <div class="field"><label>Descrição</label><textarea name="descricao" required></textarea></div>
+            <button type="submit" class="btn btn-primary">Adicionar evento</button>
+          </form>
+        </div>
+        <h3 style="margin-top:14px;">Linha do tempo</h3>
+        {eventos_html}
+      </div>
+
+      <div id="tab_auditoria" style="display:none;">
+        <h3>Auditoria</h3>
+        {auditoria_html}
+      </div>
 
       <div style="margin-top: 10px; display:flex; gap: 8px; flex-wrap:wrap;">
         <button type="submit" class="btn btn-primary">Salvar alterações</button>
@@ -853,7 +871,7 @@ def exportar_pdf(pessoa_id: int):
     y -= 20
 
     c.setFont("Helvetica", 10)
-    c.drawString(40, y, f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    c.drawString(40, y, f"Gerado em: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}")
     y -= 25
 
     def draw_label_value(label, value):
