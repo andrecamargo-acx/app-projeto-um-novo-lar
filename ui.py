@@ -1,3 +1,10 @@
+# %% [markdown]
+# # ui.py
+# Este módulo contém o **layout base** (HTML+CSS) e um helper para renderizar páginas.
+# Mantemos aqui para:
+# - reaproveitar o mesmo cabeçalho/menu em todas as telas
+# - controlar estilo de forma centralizada
+
 from flask import render_template_string
 
 layout_base = """<!doctype html>
@@ -7,6 +14,7 @@ layout_base = """<!doctype html>
   <title>{{ titulo or "Um novo lar" }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     :root{
       --bg1:#e6f0ff; --bg2:#ffffff;
@@ -33,9 +41,10 @@ layout_base = """<!doctype html>
       border-bottom:1px solid var(--border);
     }
     .brand{display:flex; align-items:center; gap:12px;}
+    /* ✅ Logo maior + fundo branco (sem degradê) */
     .brand-logo{
-      width:92px; height:92px; border-radius:18px;
-      background:#ffffff; /* fundo branco, sem degradê */
+      width:96px; height:96px; border-radius:18px;
+      background:#ffffff;
       display:flex; align-items:center; justify-content:center;
       overflow:hidden;
       border:1px solid #e5e7eb;
@@ -109,7 +118,7 @@ layout_base = """<!doctype html>
     .details-item-value{font-size:13px; font-weight:600;}
     .photo-large{width:160px; height:160px; border-radius:24px; object-fit:cover; border:3px solid #e5e7eb; box-shadow:0 15px 30px rgba(15,35,95,.25);}
     .photo-large-placeholder{width:160px; height:160px; border-radius:24px; border:2px dashed #cbd5e1; display:inline-flex; align-items:center; justify-content:center; font-size:11px; color:#9ca3af;}
-    @media (max-width:720px){body{padding:10px}.topbar{flex-direction:column; align-items:flex-start}.user-info{text-align:left}.details-layout{grid-template-columns:1fr}.brand-logo{width:88px;height:88px}}
+    @media (max-width:720px){body{padding:10px}.topbar{flex-direction:column; align-items:flex-start}.user-info{text-align:left}.details-layout{grid-template-columns:1fr}.brand-logo{width:90px;height:90px}}
   </style>
 </head>
 <body>
@@ -160,5 +169,9 @@ layout_base = """<!doctype html>
 </html>
 """
 
+
 def render_page(titulo: str, conteudo_html: str):
+    # %% [markdown]
+    # ## render_page
+    # Renderiza o `layout_base` e injeta o HTML específico da página no bloco `conteudo`.
     return render_template_string(layout_base, titulo=titulo, conteudo=conteudo_html)

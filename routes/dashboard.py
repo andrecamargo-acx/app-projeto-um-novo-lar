@@ -1,3 +1,7 @@
+# %% [markdown]
+# # routes/dashboard.py
+# Dashboard com métricas e gráficos (Chart.js).
+
 from flask import Blueprint
 from decorators import login_required
 from ui import render_page
@@ -12,6 +16,8 @@ def dashboard():
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
 
+    # %% [markdown]
+    # ## Métricas: total / ativos / inativos
     cur.execute("""
         SELECT
           SUM(CASE WHEN status = 'inativo' THEN 1 ELSE 0 END) AS inativos,
@@ -23,6 +29,8 @@ def dashboard():
     total_inativos = row_total["inativos"] or 0
     total_pessoas = total_ativos + total_inativos
 
+    # %% [markdown]
+    # ## Gráfico por status
     cur.execute("""
         SELECT COALESCE(status, 'Não informado') AS status, COUNT(*) AS total
         FROM pessoas
@@ -31,6 +39,8 @@ def dashboard():
     """)
     rows_status = cur.fetchall() or []
 
+    # %% [markdown]
+    # ## Top 5 cidades (ativos)
     cur.execute("""
         SELECT COALESCE(cidade_origem, 'Não informada') AS cidade, COUNT(*) AS total
         FROM pessoas

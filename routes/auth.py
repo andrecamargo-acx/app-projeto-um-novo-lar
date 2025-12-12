@@ -1,3 +1,11 @@
+# %% [markdown]
+# # routes/auth.py
+# Rotas de autenticação:
+# - /login
+# - /logout
+# - /registrar
+# Também tem a rota raiz / que redireciona para login ou dashboard.
+
 from flask import Blueprint, request, redirect, url_for, session, flash
 from ui import render_page
 from services.auth_service import criar_usuario, buscar_usuario_por_email, validar_senha
@@ -16,6 +24,7 @@ def login():
         email = request.form.get("email","").strip().lower()
         senha = request.form.get("senha","")
         usuario = buscar_usuario_por_email(email)
+
         if not usuario or not validar_senha(usuario["senha_hash"], senha):
             flash("Usuário ou senha inválidos.", "error")
         else:

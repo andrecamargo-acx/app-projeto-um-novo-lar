@@ -1,4 +1,14 @@
-import os
+# %% [markdown]
+# # routes/pessoas.py
+# Rotas de pessoas:
+# - listagem (inclui inativos)
+# - detalhes
+# - novo cadastro
+# - edição
+# - inativar
+# - IA (resumo e classificação)
+# - upload de foto
+
 from datetime import datetime
 from pathlib import Path
 
@@ -18,12 +28,17 @@ STATIC_DIR = BASE_DIR / "static"
 FOTOS_DIR = STATIC_DIR / "fotos_pessoas"
 FOTOS_DIR.mkdir(parents=True, exist_ok=True)
 
+
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in Config.ALLOWED_EXTENSIONS
+
 
 @bp.route("")
 @login_required
 def lista_pessoas():
+    # %% [markdown]
+    # ## lista_pessoas
+    # Lista todas as pessoas (ativos primeiro, inativos por último).
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute("""
@@ -80,9 +95,13 @@ def lista_pessoas():
     """
     return render_page("Pessoas", conteudo)
 
+
 @bp.route("/<int:pessoa_id>")
 @login_required
 def detalhes_pessoa(pessoa_id: int):
+    # %% [markdown]
+    # ## detalhes_pessoa
+    # Mostra todas as informações disponíveis do cadastro + ações (editar, inativar, IA).
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute("SELECT * FROM pessoas WHERE id = %s", (pessoa_id,))
@@ -179,9 +198,12 @@ def detalhes_pessoa(pessoa_id: int):
 
         <div style="margin-top: 10px; display:flex; gap: 8px; flex-wrap:wrap;">
           <a href="{url_for('pessoas.lista_pessoas')}" class="btn btn-secondary">Voltar para lista</a>
-          <form method="post" action="{url_for('pessoas.inativar_pessoa', pessoa_id=pessoa_id)}" onsubmit="return confirm('Tem certeza que deseja marcar este cadastro como inativo?');">
+          {('' if (pessoa.get('status') or '').strip().lower()=='inativo' else f'''<form method="post" action="{url_for('pessoas.inativar_pessoa', pessoa_id=pessoa_id)}" onsubmit="return confirm('Tem certeza que deseja marcar este cadastro como inativo?');">
             <button type="submit" class="btn btn-danger">Marcar como inativo</button>
-          </form>
+          </form>''')}
+          {('' if (pessoa.get('status') or '').strip().lower()!='inativo' else f'''<form method="post" action="{url_for('pessoas.ativar_pessoa', pessoa_id=pessoa_id)}" onsubmit="return confirm('Tem certeza que deseja reativar este cadastro?');">
+            <button type="submit" class="btn btn-primary">Reativar cadastro</button>
+          </form>''')}
         </div>
       </div>
 
@@ -195,9 +217,13 @@ def detalhes_pessoa(pessoa_id: int):
     """
     return render_page("Detalhes", conteudo)
 
+
 @bp.route("/<int:pessoa_id>/inativar", methods=["POST"])
 @login_required
 def inativar_pessoa(pessoa_id: int):
+    # %% [markdown]
+    # ## inativar_pessoa
+    # Não apaga o registro. Marca como status='inativo' para histórico.
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("UPDATE pessoas SET status = %s WHERE id = %s", ("inativo", pessoa_id))
@@ -207,9 +233,28 @@ def inativar_pessoa(pessoa_id: int):
     flash("Cadastro marcado como inativo.", "success")
     return redirect(url_for("pessoas.lista_pessoas"))
 
+# %% [markdown]
+# ## (Rota) Ativar registro
+# Permite reativar um cadastro que foi marcado como inativo.
+@bp.route("/<int:pessoa_id>/ativar", methods=["POST"])
+@login_required
+def ativar_pessoa(pessoa_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE pessoas SET status = %s WHERE id = %s", ("ativo", pessoa_id))
+    conn.commit()
+    cur.close()
+    conn.close()
+    flash("Cadastro reativado com sucesso.", "success")
+    return redirect(url_for("pessoas.lista_pessoas"))
+
+
 @bp.route("/<int:pessoa_id>/resumo_ia", methods=["POST"])
 @login_required
 def resumo_pessoa_ia(pessoa_id: int):
+    # %% [markdown]
+    # ## resumo_pessoa_ia
+    # Chama Gemini para gerar resumo e guarda em session para exibir na tela de detalhes.
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute("SELECT * FROM pessoas WHERE id = %s", (pessoa_id,))
@@ -231,9 +276,16 @@ def resumo_pessoa_ia(pessoa_id: int):
     session["resumo_ia"] = resumo
     return redirect(url_for("pessoas.detalhes_pessoa", pessoa_id=pessoa_id))
 
+
 @bp.route("/<int:pessoa_id>/classificar_ia", methods=["POST"])
 @login_required
 def classificar_pessoa_ia_route(pessoa_id: int):
+    # %% [markdown]
+    # ## classificar_pessoa_ia_route
+    # Chama Gemini para:
+    # - prioridade (alta/média/baixa)
+    # - tags (salvas no banco)
+    # - sugestões de próximos passos (mostradas na tela)
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute("SELECT * FROM pessoas WHERE id = %s", (pessoa_id,))
@@ -274,9 +326,13 @@ def classificar_pessoa_ia_route(pessoa_id: int):
     session["sugestao_ia"] = proximos_passos or "Classificação IA realizada."
     return redirect(url_for("pessoas.detalhes_pessoa", pessoa_id=pessoa_id))
 
+
 @bp.route("/nova", methods=["GET","POST"])
 @login_required
 def nova_pessoa():
+    # %% [markdown]
+    # ## nova_pessoa
+    # Tela de cadastro inicial (com upload opcional de foto).
     if request.method == "POST":
         nome = request.form.get("nome","").strip()
         apelido = request.form.get("apelido","").strip() or None
@@ -399,9 +455,14 @@ def nova_pessoa():
     """
     return render_page("Novo cadastro", conteudo)
 
+
 @bp.route("/<int:pessoa_id>/editar", methods=["GET","POST"])
 @login_required
 def editar_pessoa(pessoa_id: int):
+    # %% [markdown]
+    # ## editar_pessoa
+    # Permite inserir informações adicionais no perfil após o cadastro inicial
+    # (ex: avaliação médica, psicológica, etc.) e atualizar foto.
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
     cur.execute("SELECT * FROM pessoas WHERE id = %s", (pessoa_id,))

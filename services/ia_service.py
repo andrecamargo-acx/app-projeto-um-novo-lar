@@ -1,13 +1,28 @@
+# %% [markdown]
+# # services/ia_service.py
+# Integração com o Gemini.
+# Contém:
+# - gerar_resumo_pessoa_ia: resumo empático do caso
+# - classificar_pessoa_ia: prioridade + tags + próximos passos
+
 import json as pyjson
 import google.generativeai as genai
 from config import Config
 
+# %% [markdown]
+# ## Inicialização do modelo
+# Configura a API Key e carrega o modelo.
+# Se não houver chave, o serviço funciona em modo degradado (sem IA).
 gemini_model = None
 if Config.GEMINI_API_KEY:
     genai.configure(api_key=Config.GEMINI_API_KEY)
     gemini_model = genai.GenerativeModel(Config.GEMINI_MODEL)
 
+
 def gerar_resumo_pessoa_ia(pessoa: dict) -> str:
+    # %% [markdown]
+    # ## gerar_resumo_pessoa_ia
+    # Gera um resumo em até 2 parágrafos baseado nas informações do cadastro.
     if not gemini_model:
         return "IA não configurada (GEMINI_API_KEY ausente)."
 
@@ -40,7 +55,11 @@ Texto para analisar:
     resp = gemini_model.generate_content(prompt)
     return (resp.text or "").strip()
 
+
 def classificar_pessoa_ia(pessoa: dict) -> dict:
+    # %% [markdown]
+    # ## classificar_pessoa_ia
+    # Classifica prioridade (alta/média/baixa), tags e sugere próximos passos.
     if not gemini_model:
         return {
             "prioridade": "desconhecida",
@@ -82,6 +101,7 @@ Informações da pessoa:
     resp = gemini_model.generate_content(prompt)
     texto = (resp.text or "").strip()
 
+    # Em alguns casos o modelo retorna bloco ```json ... ```
     if texto.startswith("```"):
         texto = texto.strip("`")
         if "\n" in texto:
