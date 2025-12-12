@@ -16,6 +16,7 @@ import io
 import csv
 
 from flask import Blueprint, request, redirect, url_for, flash, session, send_file, make_response
+from markupsafe import escape
 from werkzeug.utils import secure_filename
 
 from reportlab.lib.pagesizes import A4
@@ -163,6 +164,19 @@ def detalhes_pessoa(pessoa_id: int):
 
     def _fmt(v): return v or ""
 
+    def _tags_chips(tags_str: str) -> str:
+        """Converte 'a;b;c' em chips HTML."""
+        s = (tags_str or "").strip()
+        if not s:
+            return "<span style='color:#6b7280;'>—</span>"
+        parts = [t.strip() for t in s.split(";") if t.strip()]
+        if not parts:
+            return "<span style='color:#6b7280;'>—</span>"
+        chips = "".join([f"<span class='tag-chip'>{escape(t)}</span>" for t in parts])
+        return f"<div class='tags-wrap'>{chips}</div>"
+
+    tags_chips_html = _tags_chips(pessoa.get('tags_ia') or "")
+
     # Monta HTML dos eventos de acompanhamento
     eventos_linhas = []
     for ev in eventos:
@@ -282,7 +296,12 @@ def detalhes_pessoa(pessoa_id: int):
               <div><div class="details-item-label">Status</div><div class="details-item-value">{_fmt(pessoa.get('status'))}</div></div>
               <div><div class="details-item-label">Data de cadastro</div><div class="details-item-value">{_fmt(pessoa.get('data_cadastro'))}</div></div>
               <div><div class="details-item-label">Prioridade (IA)</div><div class="details-item-value">{_fmt(pessoa.get('prioridade_ia'))}</div></div>
-              <div><div class="details-item-label">Tags (IA)</div><div class="details-item-value">{_fmt(pessoa.get('tags_ia'))}</div></div>
+
+              <!-- Tags ocupando a linha inteira e mantendo as cores -->
+              <div class="details-item tags-full">
+                <div class="details-item-label">Tags (IA)</div>
+                {tags_chips_html}
+              </div>
             </div>
           </div>
 
@@ -370,6 +389,7 @@ def inativar_pessoa(pessoa_id: int):
     registrar_auditoria(pessoa_id, session.get("usuario_id"), "status_inativado", "Cadastro marcado como inativo")
     flash("Cadastro marcado como inativo.", "success")
     return redirect(url_for("pessoas.lista_pessoas"))
+
 
 # %% [markdown]
 # ## (Rota) Ativar registro
@@ -610,7 +630,6 @@ def nova_pessoa():
         <div class="field"><label>Foto da pessoa (opcional)</label><input type="file" name="foto" accept="image/*"></div>
       </div>
 
-
       <div style="margin-top: 10px; display:flex; gap: 8px; flex-wrap:wrap;">
         <button type="submit" class="btn btn-primary">Salvar cadastro</button>
         <a href="{url_for('pessoas.lista_pessoas')}" class="btn btn-secondary">Voltar para lista</a>
@@ -752,7 +771,6 @@ def editar_pessoa(pessoa_id: int):
       <div class="field-group">
         <div class="field"><label>Foto (envie uma nova para substituir)</label><input type="file" name="foto" accept="image/*"></div>
       </div>
-
 
       <div style="margin-top: 10px; display:flex; gap: 8px; flex-wrap:wrap;">
         <button type="submit" class="btn btn-primary">Salvar alterações</button>
@@ -907,4 +925,3 @@ def exportar_pdf(pessoa_id: int):
 
     filename = f"ficha_pessoa_{pessoa_id}.pdf"
     return send_file(buffer, as_attachment=True, download_name=filename, mimetype="application/pdf")
-
