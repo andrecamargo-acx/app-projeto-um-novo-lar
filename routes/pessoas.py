@@ -192,12 +192,39 @@ def detalhes_pessoa(pessoa_id: int):
         </div>""")
     eventos_html = "".join(eventos_linhas) if eventos_linhas else "<div style='color:#6b7280;'>Sem eventos de acompanhamento ainda.</div>"
 
+    
+    def _format_auditoria_desc(raw: str) -> str:
+        """Formata descrição da auditoria e, quando houver tags=..., renderiza em chips."""
+        s = (raw or "").strip()
+        if not s:
+            return ""
+        # Protege contra HTML inesperado
+        safe = escape(s)
+        # Tenta identificar um bloco de tags no padrão 'tags=a;b;c'
+        if "tags=" in s:
+            # Extrai prefixo e tags
+            prefix, rest = s.split("tags=", 1)
+            prefix_html = escape(prefix.strip()).replace("\n", "<br>").strip()
+            tags_val = rest.strip()
+            # Em alguns casos pode vir 'tags=a;b;c outra_coisa=...'; pega até o fim mesmo.
+            parts = [t.strip() for t in tags_val.split(";") if t.strip()]
+            chips = "".join([f"<span class='tag-chip'>{escape(t)}</span>" for t in parts]) if parts else ""
+            chips_html = f"<div class='tags-wrap' style='margin-top:6px;'>{chips}</div>" if chips else ""
+            if prefix_html:
+                return f"<div class='wrap-anywhere'>{prefix_html}</div>{chips_html}"
+            return chips_html or f"<div class='wrap-anywhere'>{escape(tags_val)}</div>"
+        # padrão normal (quebra de linha + wrap)
+        safe_html = safe.replace("\n", "<br>")
+        return f"<div class='wrap-anywhere'>{safe_html}</div>"
+
+
     # Monta HTML da auditoria
     aud_linhas = []
     for au in auditoria:
         dt = au.get('criado_em') or ''
         acao = au.get('acao') or ''
-        desc = (au.get('descricao') or '').replace('\n','<br>')
+        desc_raw = (au.get('descricao') or '')
+        desc = _format_auditoria_desc(desc_raw)
         aud_linhas.append(f"""<div class='details-block'>
           <div style='display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;'>
             <div><b>{acao}</b></div>
@@ -230,6 +257,7 @@ def detalhes_pessoa(pessoa_id: int):
       .tabbar{{display:flex; gap:8px; flex-wrap:wrap; margin: 10px 0 14px 0;}}
       .tabbar .tab-btn{{border-radius:999px;}}
       .tabbar .tab-btn.active{{background:#1c75ff; color:#fff; border-color:#1c75ff;}}
+      .wrap-anywhere{{overflow-wrap:anywhere; word-break:break-word;}}
       @media (max-width: 980px){{
         .details-layout{{grid-template-columns: 1fr;}}
         .details-side .details-block{{position:static;}}
