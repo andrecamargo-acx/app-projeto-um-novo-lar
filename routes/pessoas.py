@@ -14,7 +14,8 @@ from pathlib import Path
 
 import io
 import csv
-import imghdr
+
+from PIL import Image, UnidentifiedImageError
 
 from flask import Blueprint, request, redirect, url_for, flash, session, send_file, make_response
 from markupsafe import escape
@@ -51,7 +52,7 @@ def _validate_and_read_upload(file):
     Regras:
     - extensão permitida
     - tamanho <= MAX_PHOTO_BYTES
-    - tipo real (imghdr) precisa ser imagem
+    - validação de conteúdo (Pillow) precisa ser imagem
     """
     if not file or not file.filename:
         return None
@@ -66,19 +67,23 @@ def _validate_and_read_upload(file):
     if len(raw) > MAX_PHOTO_BYTES:
         return ("error", f"Foto excede o limite de {Config.MAX_PHOTO_MB}MB.")
 
-    kind = imghdr.what(None, h=raw)
-    if kind is None:
+    # Validação real do conteúdo: Pillow (compatível com Python 3.13+)
+    try:
+        img = Image.open(io.BytesIO(raw))
+        img.verify()  # valida estrutura/assinatura
+        fmt = (getattr(img, "format", None) or "").upper()
+    except UnidentifiedImageError:
         return ("error", "Arquivo enviado não parece ser uma imagem válida.")
+    except Exception:
+        return ("error", "Não foi possível validar a imagem enviada.")
 
-    # Normaliza mime
-    if kind in ("jpeg", "jpg"):
+    if fmt in ("JPEG", "JPG"):
         mime_type = "image/jpeg"
-    elif kind == "png":
+    elif fmt == "PNG":
         mime_type = "image/png"
-    elif kind == "gif":
+    elif fmt == "GIF":
         mime_type = "image/gif"
     else:
-        # imghdr pode retornar formatos extras; restringimos ao set do app
         return ("error", "Tipo de imagem não suportado. Use PNG/JPG/JPEG/GIF.")
 
     safe_name = secure_filename(file.filename)
